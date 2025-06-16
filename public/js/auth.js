@@ -149,7 +149,7 @@ const AuthPage = ({ onLogin }) => {
           React.createElement('span', {
             key: 'error-text',
             className: "text-red-700 text-sm"
-          }, error)
+          }, error || 'Ein Fehler ist aufgetreten')
         ])
       ]),
 
@@ -305,10 +305,12 @@ const AuthPage = ({ onLogin }) => {
           onClick: toggleAuthMode,
           disabled: loading,
           className: "text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200 disabled:opacity-50"
+        }, React.createElement('span', {
+          key: 'toggle-text'
         }, isLogin 
           ? '🆕 Noch kein Account? Jetzt registrieren' 
           : '🔑 Bereits registriert? Hier anmelden'
-        )
+        ))
       ]),
 
       // Features Info
@@ -324,7 +326,9 @@ const AuthPage = ({ onLogin }) => {
             key: 'star-icon',
             className: "w-4 h-4 text-yellow-500 mr-2"
           }),
-          'ProfiSlots Features'
+          React.createElement('span', {
+            key: 'features-text'
+          }, 'ProfiSlots Features')
         ]),
         React.createElement('ul', {
           key: 'features-list',
@@ -338,7 +342,9 @@ const AuthPage = ({ onLogin }) => {
               key: 'check-1',
               className: "w-4 h-4 text-green-500 mr-2 flex-shrink-0"
             }),
-            'Terminbuchung & Verwaltung'
+            React.createElement('span', {
+              key: 'feature-1-text'
+            }, 'Terminbuchung & Verwaltung')
           ]),
           React.createElement('li', {
             key: 'feature-2',
@@ -348,7 +354,9 @@ const AuthPage = ({ onLogin }) => {
               key: 'check-2',
               className: "w-4 h-4 text-green-500 mr-2 flex-shrink-0"
             }),
-            'Kunden- & Mitarbeiterverwaltung'
+            React.createElement('span', {
+              key: 'feature-2-text'
+            }, 'Kunden- & Mitarbeiterverwaltung')
           ]),
           React.createElement('li', {
             key: 'feature-3',
@@ -358,7 +366,9 @@ const AuthPage = ({ onLogin }) => {
               key: 'check-3',
               className: "w-4 h-4 text-green-500 mr-2 flex-shrink-0"
             }),
-            'Service-Management'
+            React.createElement('span', {
+              key: 'feature-3-text'
+            }, 'Service-Management')
           ]),
           React.createElement('li', {
             key: 'feature-4',
@@ -368,7 +378,9 @@ const AuthPage = ({ onLogin }) => {
               key: 'check-4',
               className: "w-4 h-4 text-green-500 mr-2 flex-shrink-0"
             }),
-            'Dashboard & Statistiken'
+            React.createElement('span', {
+              key: 'feature-4-text'
+            }, 'Dashboard & Statistiken')
           ])
         ])
       ]),
