@@ -83,7 +83,7 @@ const authenticateToken = (req) => {
 };
 
 // Standard-Daten erstellen
-async function createDefaultData(userId) {
+const createDefaultData = async (userId) => {
   try {
     debugLog('Creating default data for user:', userId);
     
@@ -113,10 +113,10 @@ async function createDefaultData(userId) {
     debugLog('Error creating default data:', error.message);
     // Nicht kritisch, App funktioniert auch ohne Standarddaten
   }
-}
+};
 
-// Main Handler - WICHTIG: Hier ist die async function!
-module.exports = async (req, res) => {
+// Main Handler Function - FIXED: Added explicit async
+const handler = async (req, res) => {
   debugLog(`Incoming request: ${req.method} ${req.url}`);
   
   // CORS Headers setzen
@@ -323,7 +323,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Services
+    // Services - GET
     if (path === '/services' && method === 'GET') {
       try {
         const result = await pool.query(
@@ -336,7 +336,27 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Staff
+    // Services - POST
+    if (path === '/services' && method === 'POST') {
+      const { name, duration, price, icon } = req.body;
+      
+      if (!name || !duration || price === undefined) {
+        return sendError(res, 400, 'Name, Dauer und Preis sind erforderlich');
+      }
+      
+      try {
+        const result = await pool.query(
+          'INSERT INTO services (user_id, name, duration, price, icon) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [userId, name, parseInt(duration), parseFloat(price), icon || 'Scissors']
+        );
+        
+        return sendResponse(res, 201, result.rows[0]);
+      } catch (error) {
+        return sendError(res, 500, 'Service konnte nicht erstellt werden', error.message);
+      }
+    }
+
+    // Staff - GET
     if (path === '/staff' && method === 'GET') {
       try {
         const result = await pool.query(
@@ -346,6 +366,26 @@ module.exports = async (req, res) => {
         return sendResponse(res, 200, result.rows);
       } catch (error) {
         return sendError(res, 500, 'Mitarbeiter konnten nicht geladen werden', error.message);
+      }
+    }
+
+    // Staff - POST
+    if (path === '/staff' && method === 'POST') {
+      const { name, specialty, email, phone } = req.body;
+      
+      if (!name) {
+        return sendError(res, 400, 'Name ist erforderlich');
+      }
+      
+      try {
+        const result = await pool.query(
+          'INSERT INTO staff (user_id, name, specialty, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [userId, name, specialty || '', email || '', phone || '']
+        );
+        
+        return sendResponse(res, 201, result.rows[0]);
+      } catch (error) {
+        return sendError(res, 500, 'Mitarbeiter konnte nicht erstellt werden', error.message);
       }
     }
 
@@ -463,3 +503,6 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+// Export the handler function
+module.exports = handler;
