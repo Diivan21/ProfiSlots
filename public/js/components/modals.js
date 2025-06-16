@@ -410,8 +410,14 @@ const ServiceFormModal = ({ isOpen, onClose, onSave, service = null }) => {
             key: 'spinner',
             className: "loading-spinner mr-2"
           }),
-          'Wird gespeichert...'
-        ] : (isEditing ? 'Aktualisieren' : 'Erstellen'))
+          React.createElement('span', {
+            key: 'loading-text-service'
+          }, 'Wird gespeichert...')
+        ] : [
+          React.createElement('span', {
+            key: 'submit-text-service'
+          }, isEditing ? 'Aktualisieren' : 'Erstellen')
+        ])
       ])
     ])
   ]);
@@ -589,8 +595,14 @@ const CustomerFormModal = ({ isOpen, onClose, onSave, customer = null }) => {
             key: 'spinner',
             className: "loading-spinner mr-2"
           }),
-          'Wird gespeichert...'
-        ] : (isEditing ? 'Aktualisieren' : 'Erstellen'))
+          React.createElement('span', {
+            key: 'loading-text-customer'
+          }, 'Wird gespeichert...')
+        ] : [
+          React.createElement('span', {
+            key: 'submit-text-customer'
+          }, isEditing ? 'Aktualisieren' : 'Erstellen')
+        ])
       ])
     ])
   ]);
