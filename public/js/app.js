@@ -1,564 +1,160 @@
-// ProfiSlots Main App Component
-// Hauptkomponente die alle anderen zusammenfügt und das Routing übernimmt
-
-const { useState, useEffect } = React;
-
-const App = () => {
-  // Auth State
-  const { user, loading: authLoading, login, logout, isAuthenticated } = ProfiSlots.useAuth();
-  
-  // App State
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [appLoading, setAppLoading] = useState(true);
-  const [systemStatus, setSystemStatus] = useState('online');
-
-  // Initial App Setup
-  useEffect(() => {
-    initializeApp();
-  }, []);
-
-  // Check auth status changes
-  useEffect(() => {
-    if (!authLoading) {
-      setAppLoading(false);
-    }
-  }, [authLoading]);
-
-  // App Initialization
-  const initializeApp = async () => {
-    try {
-      // Check system health
-      await checkSystemHealth();
-      
-      // Load any global settings
-      await loadAppSettings();
-      
-      console.log('✅ ProfiSlots App initialized successfully');
-    } catch (error) {
-      console.error('❌ App initialization error:', error);
-      setSystemStatus('error');
-    } finally {
-      setAppLoading(false);
-    }
-  };
-
-  const checkSystemHealth = async () => {
-    try {
-      await ProfiSlots.API.system.getHealth();
-      setSystemStatus('online');
-    } catch (error) {
-      console.warn('System health check failed:', error);
-      setSystemStatus('offline');
-    }
-  };
-
-  const loadAppSettings = async () => {
-    // Load any global app settings from localStorage or API
-    const savedView = ProfiSlots.Storage.get('lastView');
-    if (savedView && isValidView(savedView)) {
-      setCurrentView(savedView);
-    }
-  };
-
-  // View Management
-  const isValidView = (view) => {
-    const validViews = ['dashboard', 'booking', 'appointments', 'customers', 'services', 'staff'];
-    return validViews.includes(view);
-  };
-
-  const handleViewChange = (newView) => {
-    if (isValidView(newView)) {
-      setCurrentView(newView);
-      ProfiSlots.Storage.set('lastView', newView);
-      
-      // Scroll to top on view change
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      console.log(`📍 View changed to: ${newView}`);
-    } else {
-      console.error('Invalid view:', newView);
-    }
-  };
-
-  // Auth Handlers
-  const handleLogin = (userData) => {
-    login(userData);
-    setCurrentView('dashboard');
-    showSuccess(`Willkommen zurück, ${userData.salonName}!`);
-  };
-
-  const handleLogout = () => {
-    logout();
-    setCurrentView('dashboard');
-    ProfiSlots.Storage.remove('lastView');
-    showSuccess('Erfolgreich abgemeldet');
-  };
-
-  // Render Current View Component
-  const renderCurrentView = () => {
-    if (!isAuthenticated) {
-      return React.createElement(ProfiSlots.AuthPage, {
-        onLogin: handleLogin
-      });
-    }
-
-    const commonProps = {
-      user,
-      onViewChange: handleViewChange
-    };
-
-    switch (currentView) {
-      case 'dashboard':
-        return React.createElement(ProfiSlots.Dashboard, commonProps);
-      
-      case 'booking':
-        return React.createElement(ProfiSlots.BookingPage, commonProps);
-      
-      case 'appointments':
-        // Temporärer Platzhalter - wird durch echte Komponente ersetzt
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '📅 Terminverwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
-      case 'customers':
-        // Temporärer Platzhalter
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '👥 Kundenverwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
-      case 'services':
-        // Temporärer Platzhalter
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '⚙️ Service-Verwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
-      case 'staff':
-        // Temporärer Platzhalter
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '👨‍💼 Mitarbeiter-Verwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
-      default:
-        console.error('Unknown view:', currentView);
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'error-title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '404 - Seite nicht gefunden'),
-          React.createElement('p', {
-            key: 'error-message',
-            className: "text-gray-600 mb-6"
-          }, `Die angeforderte Seite "${currentView}" existiert nicht.`),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-    }
-  };
-
-  // Loading Screen
-  if (appLoading || authLoading) {
-    return React.createElement('div', {
-      className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center"
-    }, [
-      React.createElement('div', {
-        key: 'loading-content',
-        className: "text-center animate-fade-in"
-      }, [
-        React.createElement('div', {
-          key: 'loading-logo',
-          className: "w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl mx-auto mb-6 flex items-center justify-center"
-        }, [
-          React.createElement(lucide.Calendar, {
-            key: 'loading-icon',
-            className: "w-12 h-12 text-white"
-          })
-        ]),
-        React.createElement('h1', {
-          key: 'loading-title',
-          className: "text-3xl font-bold text-gray-800 mb-2"
-        }, 'ProfiSlots'),
-        React.createElement('div', {
-          key: 'loading-spinner',
-          className: "w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"
-        }),
-        React.createElement('p', {
-          key: 'loading-text',
-          className: "text-gray-600"
-        }, 'Terminbuchungssystem wird geladen...'),
-        
-        // System Status Indicator
-        systemStatus !== 'online' && React.createElement('div', {
-          key: 'system-status',
-          className: `mt-4 p-3 rounded-lg ${
-            systemStatus === 'offline' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-          }`
-        }, [
-          React.createElement('div', {
-            key: 'status-content',
-            className: "flex items-center justify-center"
-          }, [
-            React.createElement(lucide.AlertTriangle, {
-              key: 'status-icon',
-              className: "w-4 h-4 mr-2"
-            }),
-            React.createElement('span', {
-              key: 'status-text',
-              className: "text-sm"
-            }, systemStatus === 'offline' 
-              ? 'Verbindung zum Server wird hergestellt...' 
-              : 'Systemfehler - Bitte versuchen Sie es später erneut'
-            )
-          ])
-        ])
-      ])
-    ]);
-  }
-
-  // System Error Screen
-  if (systemStatus === 'error') {
-    return React.createElement('div', {
-      className: "min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4"
-    }, [
-      React.createElement('div', {
-        key: 'error-content',
-        className: "bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"
-      }, [
-        React.createElement('div', {
-          key: 'error-icon',
-          className: "w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"
-        }, [
-          React.createElement(lucide.AlertCircle, {
-            key: 'error-icon-svg',
-            className: "w-8 h-8 text-red-600"
-          })
-        ]),
-        React.createElement('h1', {
-          key: 'error-title',
-          className: "text-2xl font-bold text-gray-800 mb-4"
-        }, 'Systemfehler'),
-        React.createElement('p', {
-          key: 'error-message',
-          className: "text-gray-600 mb-6"
-        }, 'Es gab ein Problem beim Laden von ProfiSlots. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support.'),
-        React.createElement('button', {
-          key: 'retry-button',
-          onClick: () => window.location.reload(),
-          className: "btn-primary w-full"
-        }, 'Seite neu laden')
-      ])
-    ]);
-  }
-
-  // Main App Layout
-  return React.createElement('div', {
-    className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100"
-  }, [
-    // Header (nur wenn authentifiziert)
-    isAuthenticated && React.createElement(ProfiSlots.Header, {
-      key: 'header',
-      user,
-      onLogout: handleLogout,
-      currentView,
-      onViewChange: handleViewChange
-    }),
-
-    // Main Content
-    React.createElement('main', {
-      key: 'main-content',
-      className: isAuthenticated ? 'pb-8' : ''
-    }, [
-      renderCurrentView()
-    ]),
-
-    // Footer (nur wenn authentifiziert)
-    isAuthenticated && React.createElement('footer', {
-      key: 'footer',
-      className: "bg-white border-t border-gray-200 py-6 mt-8"
-    }, [
-      React.createElement('div', {
-        key: 'footer-content',
-        className: "container-main"
-      }, [
-        React.createElement('div', {
-          key: 'footer-inner',
-          className: "flex flex-col md:flex-row items-center justify-between"
-        }, [
-          React.createElement('div', {
-            key: 'footer-brand',
-            className: "flex items-center space-x-2 mb-4 md:mb-0"
-          }, [
-            React.createElement('div', {
-              key: 'footer-logo',
-              className: "w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center"
-            }, [
-              React.createElement(lucide.Calendar, {
-                key: 'footer-icon',
-                className: "w-5 h-5 text-white"
-              })
-            ]),
-            React.createElement('span', {
-              key: 'footer-text',
-              className: "text-gray-600 text-sm"
-            }, `© 2024 ProfiSlots - ${user?.salonName}`)
-          ]),
-          React.createElement('div', {
-            key: 'footer-status',
-            className: "flex items-center space-x-4 text-sm text-gray-500"
-          }, [
-            React.createElement('div', {
-              key: 'system-status-footer',
-              className: "flex items-center space-x-2"
-            }, [
-              React.createElement('div', {
-                key: 'status-dot',
-                className: `w-2 h-2 rounded-full ${
-                  systemStatus === 'online' ? 'bg-green-500' : 'bg-yellow-500'
-                }`
-              }),
-              React.createElement('span', {
-                key: 'status-label'
-              }, systemStatus === 'online' ? 'System Online' : 'Verbindung prüfen')
-            ]),
-            React.createElement('span', {
-              key: 'version',
-              className: "text-xs"
-            }, 'v1.0.0')
-          ])
-        ])
-      ])
-    ])
-  ]);
-};
-
-// ==================== ERROR BOUNDARY ====================
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    this.setState({
-      error: error,
-      errorInfo: errorInfo
-    });
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ProfiSlots - Professionelles Terminbuchungssystem für Friseure, Handwerker und Selbstständige">
+    <meta name="keywords" content="Terminbuchung, Friseur, Handwerker, Appointment, Booking">
+    <title>ProfiSlots - Terminbuchungssystem</title>
     
-    // Log error to console and error tracking service
-    console.error('React Error Boundary caught an error:', error, errorInfo);
-    ProfiSlots.ErrorHandler.log(error, 'React Error Boundary');
-  }
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    
+    <!-- External Libraries -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="/css/styles.css">
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- App Container -->
+    <div id="app" class="min-h-screen">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+            <div class="text-center">
+                <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">ProfiSlots</h2>
+                <p class="text-gray-600">Terminbuchungssystem wird geladen...</p>
+            </div>
+        </div>
+    </div>
 
-  render() {
-    if (this.state.hasError) {
-      return React.createElement('div', {
-        className: "min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4"
-      }, [
-        React.createElement('div', {
-          key: 'error-boundary-content',
-          className: "bg-white rounded-lg shadow-xl p-8 max-w-lg w-full"
-        }, [
-          React.createElement('div', {
-            key: 'error-icon',
-            className: "w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"
-          }, [
-            React.createElement(lucide.AlertTriangle, {
-              key: 'error-icon-svg',
-              className: "w-8 h-8 text-red-600"
-            })
-          ]),
-          React.createElement('h1', {
-            key: 'error-title',
-            className: "text-2xl font-bold text-gray-800 mb-4 text-center"
-          }, 'Unerwarteter Fehler'),
-          React.createElement('p', {
-            key: 'error-message',
-            className: "text-gray-600 mb-6 text-center"
-          }, 'Es ist ein unerwarteter Fehler in der Anwendung aufgetreten. Bitte laden Sie die Seite neu oder kontaktieren Sie den Support.'),
-          
-          // Error Details (nur in Development)
-          typeof window !== 'undefined' && window.location.hostname === 'localhost' && React.createElement('details', {
-            key: 'error-details',
-            className: "mb-6 p-4 bg-gray-50 rounded-lg"
-          }, [
-            React.createElement('summary', {
-              key: 'error-summary',
-              className: "cursor-pointer font-medium text-gray-700 mb-2"
-            }, 'Fehlerdetails (Development)'),
-            React.createElement('pre', {
-              key: 'error-stack',
-              className: "text-xs text-gray-600 overflow-auto"
-            }, this.state.error && this.state.error.toString()),
-            React.createElement('pre', {
-              key: 'error-component-stack',
-              className: "text-xs text-gray-600 overflow-auto mt-2"
-            }, this.state.errorInfo.componentStack)
-          ]),
-          
-          React.createElement('div', {
-            key: 'error-actions',
-            className: "flex space-x-3"
-          }, [
-            React.createElement('button', {
-              key: 'reload-button',
-              onClick: () => window.location.reload(),
-              className: "flex-1 btn-primary"
-            }, 'Seite neu laden'),
-            React.createElement('button', {
-              key: 'reset-button',
-              onClick: () => {
-                ProfiSlots.Storage.clear();
-                window.location.reload();
-              },
-              className: "flex-1 btn-secondary"
-            }, 'App zurücksetzen')
-          ])
-        ])
-      ]);
-    }
+    <!-- Error Display -->
+    <div id="error-container" class="hidden fixed top-4 right-4 z-50">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <span id="error-message">Ein Fehler ist aufgetreten</span>
+                <button onclick="hideError()" class="ml-4 text-red-700 hover:text-red-900">×</button>
+            </div>
+        </div>
+    </div>
 
-    return this.props.children;
-  }
-}
+    <!-- Success Display -->
+    <div id="success-container" class="hidden fixed top-4 right-4 z-50">
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+                <span id="success-message">Erfolgreich!</span>
+                <button onclick="hideSuccess()" class="ml-4 text-green-700 hover:text-green-900">×</button>
+            </div>
+        </div>
+    </div>
 
-// ==================== APP INITIALIZATION ====================
-const initializeProfiSlots = () => {
-  // Check if all required components are loaded
-  const requiredComponents = [
-    'ProfiSlots.Header',
-    'ProfiSlots.AuthPage', 
-    'ProfiSlots.Dashboard',
-    'ProfiSlots.BookingPage',
-    'ProfiSlots.useAuth',
-    'ProfiSlots.API'
-  ];
+    <!-- Global Variables for Browser -->
+    <script>
+        // Define process.env for browser compatibility
+        window.process = window.process || { env: { NODE_ENV: 'production' } };
+    </script>
 
-  const missingComponents = requiredComponents.filter(component => {
-    return !eval(`typeof ${component}`) || eval(`typeof ${component}`) === 'undefined';
-  });
+    <!-- Module Scripts (Load Order Important!) -->
+    <script src="/js/utils.js"></script>
+    <script src="/js/api.js"></script>
+    <script type="text/babel" src="/js/components/header.js"></script>
+    <script type="text/babel" src="/js/components/modals.js"></script>
+    <script type="text/babel" src="/js/auth.js"></script>
+    <script type="text/babel" src="/js/dashboard.js"></script>
+    <script type="text/babel" src="/js/booking.js"></script>
+    <script type="text/babel" src="/js/app.js"></script>
 
-  if (missingComponents.length > 0) {
-    console.error('❌ Missing required components:', missingComponents);
-    showError('Fehler beim Laden der Anwendung. Bitte laden Sie die Seite neu.');
-    return;
-  }
+    <!-- Global Error Handler -->
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('Global Error:', e.error);
+            showError('Ein unerwarteter Fehler ist aufgetreten');
+        });
 
-  // All components loaded, render the app
-  console.log('🚀 All components loaded, starting ProfiSlots...');
-  
-  const appContainer = document.getElementById('app');
-  if (!appContainer) {
-    console.error('❌ App container not found');
-    return;
-  }
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled Promise Rejection:', e.reason);
+            showError('Verbindungsfehler - Bitte versuchen Sie es erneut');
+        });
 
-  // Clear loading screen
-  appContainer.innerHTML = '';
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-container').classList.remove('hidden');
+            setTimeout(hideError, 5000);
+        }
 
-  // Render app with error boundary
-  ReactDOM.render(
-    React.createElement(ErrorBoundary, {}, [
-      React.createElement(App, { key: 'app' })
-    ]), 
-    appContainer
-  );
+        function hideError() {
+            document.getElementById('error-container').classList.add('hidden');
+        }
 
-  console.log('✅ ProfiSlots App started successfully');
-};
+        function showSuccess(message) {
+            document.getElementById('success-message').textContent = message;
+            document.getElementById('success-container').classList.remove('hidden');
+            setTimeout(hideSuccess, 3000);
+        }
 
-// ==================== STARTUP ====================
-// Wait for DOM to be ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeProfiSlots);
-} else {
-  // DOM is already ready
-  initializeProfiSlots();
-}
+        function hideSuccess() {
+            document.getElementById('success-container').classList.add('hidden');
+        }
 
-// Global error handlers
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('Unhandled promise rejection:', event.reason);
-  ProfiSlots.ErrorHandler.log(event.reason, 'Unhandled Promise Rejection');
-  
-  // Prevent the default browser behavior
-  event.preventDefault();
-  
-  // Show user-friendly error message
-  showError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
-});
+        // Make functions globally available
+        window.showError = showError;
+        window.hideError = hideError;
+        window.showSuccess = showSuccess;
+        window.hideSuccess = hideSuccess;
+    </script>
 
-window.addEventListener('error', (event) => {
-  console.error('Global error:', event.error);
-  ProfiSlots.ErrorHandler.log(event.error, 'Global Error Handler');
-  
-  // Show user-friendly error message for critical errors
-  if (event.error && event.error.message) {
-    showError('Ein Systemfehler ist aufgetreten. Bitte laden Sie die Seite neu.');
-  }
-});
-
-console.log('✅ ProfiSlots Main App loaded');
+    <!-- Performance Monitoring -->
+    <script>
+        window.addEventListener('load', function() {
+            const loadTime = performance.now();
+            console.log(`ProfiSlots loaded in ${Math.round(loadTime)}ms`);
+            
+            // Hide loading screen
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                setTimeout(() => {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                    }, 300);
+                }, 500);
+            }
+        });
+    </script>
+</body>
+</html>
