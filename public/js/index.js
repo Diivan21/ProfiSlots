@@ -1,31 +1,71 @@
-// ProfiSlots Backend API
-// Vollständiges Node.js Backend für Vercel mit PostgreSQL
-
+// ProfiSlots API - Vercel Serverless Function
 const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-// ==================== DATABASE CONNECTION ====================
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+// Debug Logging
+const debugLog = (message, data = null) => {
+  console.log(`[DEBUG ${new Date().toISOString()}] ${message}`);
+  if (data) {
+    console.log(JSON.stringify(data, null, 2));
+  }
+};
 
-// Test database connection
-pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL database');
-});
+// Environment Variables Check
+console.log('=== ProfiSlots API Starting ===');
+console.log('NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-pool.on('error', (err) => {
-  console.error('❌ Database connection error:', err);
-});
+// Database Connection mit URL-Dekodierung
+let pool;
+try {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
 
-// ==================== HELPER FUNCTIONS ====================
+  // URL dekodieren für Sonderzeichen im Passwort
+  const databaseUrl = decodeURIComponent(process.env.DATABASE_URL);
+  console.log('Using database URL (masked):', databaseUrl.replace(/:[^:@]+@/, ':***@'));
 
-// JWT Authentication
+  pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: {
+      rejectUnauthorized: false
+    },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  console.log('✅ Database pool created successfully');
+} catch (error) {
+  console.error('❌ Database pool creation failed:', error.message);
+}
+
+// Helper Functions
+const setCORSHeaders = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+};
+
+const sendResponse = (res, status, data) => {
+  res.status(status).json({
+    ...data,
+    timestamp: new Date().toISOString()
+  });
+};
+
+const sendError = (res, status, message, details = null) => {
+  console.error(`API Error ${status}: ${message}`, details);
+  sendResponse(res, status, {
+    error: message,
+    ...(details && process.env.NODE_ENV !== 'production' && { details })
+  });
+};
+
+// Authentication Helper
 const authenticateToken = (req) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
@@ -38,110 +78,51 @@ const authenticateToken = (req) => {
     const user = jwt.verify(token, process.env.JWT_SECRET || '306651848');
     return user.id;
   } catch (err) {
-    throw new Error('Ungültiger oder abgelaufener Token');
+    throw new Error('Ungültiger Token');
   }
 };
 
-// CORS Headers
-const setCORSHeaders = (res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-};
-
-// Error Response Helper
-const sendError = (res, status, message, details = null) => {
-  const errorResponse = {
-    error: message,
-    timestamp: new Date().toISOString()
-  };
-  
-  if (details && process.env.NODE_ENV !== 'production') {
-    errorResponse.details = details;
-  }
-  
-  console.error(`API Error ${status}: ${message}`, details);
-  return res.status(status).json(errorResponse);
-};
-
-// Success Response Helper
-const sendSuccess = (res, data, message = null) => {
-  const response = {
-    ...data,
-    timestamp: new Date().toISOString()
-  };
-  
-  if (message) {
-    response.message = message;
-  }
-  
-  return res.status(200).json(response);
-};
-
-// Input Validation
-const validateEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const validatePassword = (password) => {
-  return password && password.length >= 6;
-};
-
-const validateName = (name) => {
-  return name && name.trim().length >= 2;
-};
-
-const validatePhone = (phone) => {
-  return phone && phone.trim().length >= 8;
-};
-
-// ==================== DEFAULT DATA CREATION ====================
+// Standard-Daten erstellen
 async function createDefaultData(userId) {
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
+    debugLog('Creating default data for user:', userId);
     
-    // Default Services
+    // Standard Services
     const defaultServices = [
       { name: 'Haarschnitt', duration: 60, price: 45.00, icon: 'Scissors' },
       { name: 'Färbung', duration: 120, price: 80.00, icon: 'Scissors' },
-      { name: 'Massage (60 Min)', duration: 60, price: 65.00, icon: 'Heart' },
-      { name: 'Beratung', duration: 30, price: 35.00, icon: 'MessageSquare' },
-      { name: 'Styling', duration: 45, price: 40.00, icon: 'Scissors' }
+      { name: 'Massage', duration: 60, price: 65.00, icon: 'Heart' },
+      { name: 'Beratung', duration: 30, price: 35.00, icon: 'MessageSquare' }
     ];
     
     for (const service of defaultServices) {
-      await client.query(
+      await pool.query(
         'INSERT INTO services (user_id, name, duration, price, icon) VALUES ($1, $2, $3, $4, $5)',
         [userId, service.name, service.duration, service.price, service.icon]
       );
     }
     
-    // Default Staff Member
-    await client.query(
+    // Standard Mitarbeiter
+    await pool.query(
       'INSERT INTO staff (user_id, name, specialty, email, phone) VALUES ($1, $2, $3, $4, $5)',
       [userId, 'Standard Mitarbeiter', 'Allgemein', '', '']
     );
     
-    await client.query('COMMIT');
-    console.log(`✅ Default data created for user ${userId}`);
-    
+    debugLog('Default data created successfully');
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('❌ Error creating default data:', error);
-    throw error;
-  } finally {
-    client.release();
+    debugLog('Error creating default data:', error.message);
+    // Nicht kritisch, App funktioniert auch ohne Standarddaten
   }
 }
 
-// ==================== MAIN API HANDLER ====================
+// Main Handler - WICHTIG: Hier ist die async function!
 module.exports = async (req, res) => {
+  debugLog(`Incoming request: ${req.method} ${req.url}`);
+  
+  // CORS Headers setzen
   setCORSHeaders(res);
   
-  // Handle preflight requests
+  // OPTIONS Request für CORS
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -149,99 +130,101 @@ module.exports = async (req, res) => {
   const { url, method } = req;
   const path = url.replace('/api', '') || '/';
   
-  console.log(`🌐 ${method} ${path}`, {
-    timestamp: new Date().toISOString(),
-    userAgent: req.headers['user-agent']?.substring(0, 50)
-  });
-
   try {
     // ==================== HEALTH CHECK ====================
-    if (path.includes('/health')) {
+    if (path.includes('/health') || path === '/health') {
+      debugLog('Health check requested');
+      
       try {
-        // Test database connection
-        await pool.query('SELECT NOW()');
-        return sendSuccess(res, {
+        // Database Connection Test
+        if (!pool) {
+          throw new Error('Database pool not initialized');
+        }
+        
+        // Einfacher Test
+        const client = await pool.connect();
+        const dbResult = await client.query('SELECT NOW() as time, current_database() as db');
+        client.release();
+        
+        debugLog('Database connection successful');
+        
+        return sendResponse(res, 200, {
           status: 'ProfiSlots API Online',
-          version: '1.0.0',
           database: 'Connected',
-          environment: process.env.NODE_ENV || 'development'
+          dbTime: dbResult.rows[0].time,
+          database_name: dbResult.rows[0].db,
+          environment: process.env.NODE_ENV || 'development',
+          node_version: process.version
         });
       } catch (dbError) {
-        return sendError(res, 503, 'Database connection failed', dbError.message);
+        debugLog('Database error in health check:', dbError.message);
+        console.error('Full DB Error:', dbError);
+        
+        return sendError(res, 503, 'Database connection failed', {
+          message: dbError.message,
+          code: dbError.code,
+          detail: dbError.detail
+        });
       }
     }
 
     // ==================== API INFO ====================
     if (path === '/' || path === '') {
-      return sendSuccess(res, {
+      return sendResponse(res, 200, {
         message: 'ProfiSlots Terminbuchungssystem API',
         status: 'online',
         version: '1.0.0',
         endpoints: {
+          system: ['GET /health'],
           auth: ['POST /register', 'POST /login'],
-          dashboard: ['GET /dashboard'],
-          services: ['GET /services', 'POST /services', 'PUT /services/:id', 'DELETE /services/:id'],
-          staff: ['GET /staff', 'POST /staff', 'PUT /staff/:id', 'DELETE /staff/:id'],
-          customers: ['GET /customers', 'POST /customers', 'PUT /customers/:id', 'DELETE /customers/:id', 'GET /customers/search'],
-          appointments: ['GET /appointments', 'POST /appointments', 'PUT /appointments/:id', 'DELETE /appointments/:id', 'GET /appointments/date/:date']
+          protected: ['GET /dashboard', 'GET /services', 'GET /staff', 'GET /customers', 'GET /appointments']
         }
       });
     }
 
-    // ==================== AUTHENTICATION ROUTES ====================
-    
-    // User Registration
+    // ==================== REGISTRIERUNG ====================
     if (path === '/register' && method === 'POST') {
+      debugLog('Registration attempt');
+      
       const { email, password, salonName } = req.body;
       
-      // Validation
       if (!email || !password || !salonName) {
         return sendError(res, 400, 'E-Mail, Passwort und Salon-Name sind erforderlich');
       }
 
-      if (!validateEmail(email)) {
-        return sendError(res, 400, 'Ungültige E-Mail-Adresse');
-      }
-
-      if (!validatePassword(password)) {
+      if (password.length < 6) {
         return sendError(res, 400, 'Passwort muss mindestens 6 Zeichen haben');
       }
-
-      if (!validateName(salonName)) {
-        return sendError(res, 400, 'Gültiger Salon-Name ist erforderlich');
-      }
-      
-      const client = await pool.connect();
       
       try {
-        // Check if email already exists
-        const existingUser = await client.query(
+        // Check if email exists
+        const existingUser = await pool.query(
           'SELECT id FROM users WHERE email = $1',
           [email.toLowerCase()]
         );
         
         if (existingUser.rows.length > 0) {
-          return sendError(res, 409, 'Diese E-Mail-Adresse ist bereits registriert');
+          return sendError(res, 409, 'Diese E-Mail ist bereits registriert');
         }
         
         // Hash password
-        const saltRounds = 12;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const hashedPassword = await bcrypt.hash(password, 12);
         
         // Create user
-        const result = await client.query(
+        const result = await pool.query(
           'INSERT INTO users (email, password, salon_name) VALUES ($1, $2, $3) RETURNING id, email, salon_name, created_at',
-          [email.toLowerCase(), hashedPassword, salonName.trim()]
+          [email.toLowerCase(), hashedPassword, salonName]
         );
         
         const newUser = result.rows[0];
+        debugLog('User created successfully:', { id: newUser.id, email: newUser.email });
         
-        // Create default data
-        await createDefaultData(newUser.id);
+        // Create default data (non-critical)
+        createDefaultData(newUser.id).catch(err => 
+          debugLog('Default data creation failed (non-critical):', err.message)
+        );
         
-        console.log(`✅ New user registered: ${newUser.email}`);
-        
-        return sendSuccess(res, {
+        return sendResponse(res, 201, {
           message: 'Account erfolgreich erstellt! Sie können sich jetzt anmelden.',
           user: {
             id: newUser.id,
@@ -250,578 +233,233 @@ module.exports = async (req, res) => {
             createdAt: newUser.created_at
           }
         });
-        
-      } finally {
-        client.release();
+      } catch (error) {
+        debugLog('Registration error:', error.message);
+        return sendError(res, 500, 'Registrierung fehlgeschlagen', error.message);
       }
     }
 
-    // User Login
+    // ==================== LOGIN ====================
     if (path === '/login' && method === 'POST') {
+      debugLog('Login attempt');
+      
       const { email, password } = req.body;
       
       if (!email || !password) {
         return sendError(res, 400, 'E-Mail und Passwort sind erforderlich');
       }
       
-      const result = await pool.query(
-        'SELECT id, email, password, salon_name, created_at FROM users WHERE email = $1',
-        [email.toLowerCase()]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 401, 'E-Mail oder Passwort ist falsch');
-      }
-      
-      const user = result.rows[0];
-      const validPassword = await bcrypt.compare(password, user.password);
-      
-      if (!validPassword) {
-        return sendError(res, 401, 'E-Mail oder Passwort ist falsch');
-      }
-      
-      // Generate JWT token
-      const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email 
-        }, 
-        process.env.JWT_SECRET || '306651848', 
-        { expiresIn: '7d' }
-      );
-      
-      console.log(`✅ User logged in: ${user.email}`);
-      
-      return sendSuccess(res, {
-        message: 'Erfolgreich angemeldet',
-        token, 
-        user: { 
-          id: user.id, 
-          email: user.email, 
-          salonName: user.salon_name,
-          createdAt: user.created_at
+      try {
+        const result = await pool.query(
+          'SELECT id, email, password, salon_name, created_at FROM users WHERE email = $1',
+          [email.toLowerCase()]
+        );
+        
+        if (result.rows.length === 0) {
+          return sendError(res, 401, 'E-Mail oder Passwort ist falsch');
         }
-      });
+        
+        const user = result.rows[0];
+        const validPassword = await bcrypt.compare(password, user.password);
+        
+        if (!validPassword) {
+          return sendError(res, 401, 'E-Mail oder Passwort ist falsch');
+        }
+        
+        // Generate JWT token
+        const token = jwt.sign(
+          { id: user.id, email: user.email }, 
+          process.env.JWT_SECRET || '306651848', 
+          { expiresIn: '7d' }
+        );
+        
+        debugLog('Login successful for user:', user.email);
+        
+        return sendResponse(res, 200, {
+          message: 'Erfolgreich angemeldet',
+          token, 
+          user: { 
+            id: user.id, 
+            email: user.email, 
+            salonName: user.salon_name,
+            createdAt: user.created_at
+          }
+        });
+      } catch (error) {
+        debugLog('Login error:', error.message);
+        return sendError(res, 500, 'Anmeldung fehlgeschlagen', error.message);
+      }
     }
 
     // ==================== PROTECTED ROUTES ====================
-    const userId = authenticateToken(req);
+    let userId;
+    try {
+      userId = authenticateToken(req);
+    } catch (authError) {
+      return sendError(res, 401, authError.message);
+    }
 
-    // Dashboard Statistics
+    // Dashboard Stats
     if (path === '/dashboard' && method === 'GET') {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const [appointmentsResult, customersResult, servicesResult] = await Promise.all([
-        pool.query(
-          'SELECT COUNT(*) as count FROM appointments WHERE user_id = $1 AND appointment_date = $2 AND status != $3', 
-          [userId, today, 'cancelled']
-        ),
-        pool.query('SELECT COUNT(*) as count FROM customers WHERE user_id = $1', [userId]),
-        pool.query('SELECT COUNT(*) as count FROM services WHERE user_id = $1', [userId])
-      ]);
-      
-      return sendSuccess(res, {
-        todayAppointments: parseInt(appointmentsResult.rows[0].count),
-        totalCustomers: parseInt(customersResult.rows[0].count),
-        totalServices: parseInt(servicesResult.rows[0].count)
-      });
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        const [appointmentsResult, customersResult, servicesResult] = await Promise.all([
+          pool.query(
+            'SELECT COUNT(*) as count FROM appointments WHERE user_id = $1 AND appointment_date = $2 AND status != $3', 
+            [userId, today, 'cancelled']
+          ),
+          pool.query('SELECT COUNT(*) as count FROM customers WHERE user_id = $1', [userId]),
+          pool.query('SELECT COUNT(*) as count FROM services WHERE user_id = $1', [userId])
+        ]);
+        
+        return sendResponse(res, 200, {
+          todayAppointments: parseInt(appointmentsResult.rows[0].count),
+          totalCustomers: parseInt(customersResult.rows[0].count),
+          totalServices: parseInt(servicesResult.rows[0].count)
+        });
+      } catch (error) {
+        return sendError(res, 500, 'Dashboard-Daten konnten nicht geladen werden', error.message);
+      }
     }
 
-    // ==================== SERVICES ROUTES ====================
-    
-    // Get all services
+    // Services
     if (path === '/services' && method === 'GET') {
-      const result = await pool.query(
-        'SELECT * FROM services WHERE user_id = $1 ORDER BY created_at ASC',
-        [userId]
-      );
-      return sendSuccess(res, result.rows);
+      try {
+        const result = await pool.query(
+          'SELECT * FROM services WHERE user_id = $1 ORDER BY created_at ASC',
+          [userId]
+        );
+        return sendResponse(res, 200, result.rows);
+      } catch (error) {
+        return sendError(res, 500, 'Services konnten nicht geladen werden', error.message);
+      }
     }
 
-    // Create service
-    if (path === '/services' && method === 'POST') {
-      const { name, duration, price, icon } = req.body;
-      
-      if (!validateName(name) || !duration || duration <= 0 || price < 0) {
-        return sendError(res, 400, 'Ungültige Service-Daten');
-      }
-
-      const result = await pool.query(
-        'INSERT INTO services (user_id, name, duration, price, icon) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [userId, name.trim(), parseInt(duration), parseFloat(price), icon || 'Scissors']
-      );
-      
-      return sendSuccess(res, result.rows[0], 'Service erfolgreich erstellt');
-    }
-
-    // Update service
-    if (path.startsWith('/services/') && method === 'PUT') {
-      const serviceId = path.split('/')[2];
-      const { name, duration, price, icon } = req.body;
-      
-      if (!validateName(name) || !duration || duration <= 0 || price < 0) {
-        return sendError(res, 400, 'Ungültige Service-Daten');
-      }
-
-      const result = await pool.query(
-        'UPDATE services SET name = $1, duration = $2, price = $3, icon = $4 WHERE id = $5 AND user_id = $6 RETURNING *',
-        [name.trim(), parseInt(duration), parseFloat(price), icon || 'Scissors', serviceId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Service nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Service erfolgreich aktualisiert');
-    }
-
-    // Delete service
-    if (path.startsWith('/services/') && method === 'DELETE') {
-      const serviceId = path.split('/')[2];
-      
-      const result = await pool.query(
-        'DELETE FROM services WHERE id = $1 AND user_id = $2 RETURNING *',
-        [serviceId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Service nicht gefunden');
-      }
-      
-      return sendSuccess(res, {}, 'Service erfolgreich gelöscht');
-    }
-
-    // ==================== STAFF ROUTES ====================
-    
-    // Get all staff
+    // Staff
     if (path === '/staff' && method === 'GET') {
-      const result = await pool.query(
-        'SELECT * FROM staff WHERE user_id = $1 ORDER BY created_at ASC',
-        [userId]
-      );
-      return sendSuccess(res, result.rows);
-    }
-
-    // Create staff member
-    if (path === '/staff' && method === 'POST') {
-      const { name, specialty, email, phone } = req.body;
-      
-      if (!validateName(name)) {
-        return sendError(res, 400, 'Name ist erforderlich');
-      }
-
-      const result = await pool.query(
-        'INSERT INTO staff (user_id, name, specialty, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [userId, name.trim(), specialty?.trim() || '', email?.trim() || '', phone?.trim() || '']
-      );
-      
-      return sendSuccess(res, result.rows[0], 'Mitarbeiter erfolgreich erstellt');
-    }
-
-    // Update staff member
-    if (path.startsWith('/staff/') && method === 'PUT') {
-      const staffId = path.split('/')[2];
-      const { name, specialty, email, phone } = req.body;
-      
-      if (!validateName(name)) {
-        return sendError(res, 400, 'Name ist erforderlich');
-      }
-
-      const result = await pool.query(
-        'UPDATE staff SET name = $1, specialty = $2, email = $3, phone = $4 WHERE id = $5 AND user_id = $6 RETURNING *',
-        [name.trim(), specialty?.trim() || '', email?.trim() || '', phone?.trim() || '', staffId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Mitarbeiter nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Mitarbeiter erfolgreich aktualisiert');
-    }
-
-    // Delete staff member
-    if (path.startsWith('/staff/') && method === 'DELETE') {
-      const staffId = path.split('/')[2];
-      
-      const client = await pool.connect();
-      
       try {
-        await client.query('BEGIN');
-        
-        // Cancel appointments with this staff member
-        await client.query(
-          'UPDATE appointments SET status = $1 WHERE staff_id = $2 AND user_id = $3',
-          ['cancelled', staffId, userId]
+        const result = await pool.query(
+          'SELECT * FROM staff WHERE user_id = $1 ORDER BY created_at ASC',
+          [userId]
         );
-        
-        // Delete staff member
-        const result = await client.query(
-          'DELETE FROM staff WHERE id = $1 AND user_id = $2 RETURNING *',
-          [staffId, userId]
-        );
-        
-        if (result.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return sendError(res, 404, 'Mitarbeiter nicht gefunden');
-        }
-        
-        await client.query('COMMIT');
-        return sendSuccess(res, {}, 'Mitarbeiter erfolgreich gelöscht');
-        
+        return sendResponse(res, 200, result.rows);
       } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
+        return sendError(res, 500, 'Mitarbeiter konnten nicht geladen werden', error.message);
       }
     }
 
-    // ==================== CUSTOMERS ROUTES ====================
-    
-    // Get all customers
+    // Customers - GET
     if (path === '/customers' && method === 'GET') {
-      const result = await pool.query(
-        'SELECT * FROM customers WHERE user_id = $1 ORDER BY created_at DESC',
-        [userId]
-      );
-      return sendSuccess(res, result.rows);
-    }
-
-    // Search customers
-    if (path === '/customers/search' && method === 'GET') {
-      const { q } = req.query;
-      
-      if (!q || q.trim().length < 2) {
-        return sendSuccess(res, []);
+      try {
+        const result = await pool.query(
+          'SELECT * FROM customers WHERE user_id = $1 ORDER BY created_at DESC',
+          [userId]
+        );
+        return sendResponse(res, 200, result.rows);
+      } catch (error) {
+        return sendError(res, 500, 'Kunden konnten nicht geladen werden', error.message);
       }
-      
-      const searchTerm = `%${q.trim().toLowerCase()}%`;
-      const result = await pool.query(
-        'SELECT * FROM customers WHERE user_id = $1 AND (LOWER(name) LIKE $2 OR phone LIKE $2) ORDER BY name ASC LIMIT 10',
-        [userId, searchTerm]
-      );
-      
-      return sendSuccess(res, result.rows);
     }
 
-    // Create customer
+    // Customers - POST
     if (path === '/customers' && method === 'POST') {
-      const { name, phone, email } = req.body;
+      const { name, email, phone } = req.body;
       
-      if (!validateName(name)) {
-        return sendError(res, 400, 'Gültiger Name ist erforderlich');
+      if (!name) {
+        return sendError(res, 400, 'Name ist erforderlich');
       }
-      
-      if (!validatePhone(phone)) {
-        return sendError(res, 400, 'Gültige Telefonnummer ist erforderlich');
-      }
-      
-      if (email && email.trim() && !validateEmail(email)) {
-        return sendError(res, 400, 'Gültige E-Mail-Adresse ist erforderlich');
-      }
-
-      const result = await pool.query(
-        'INSERT INTO customers (user_id, name, phone, email, total_visits, last_visit) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [userId, name.trim(), phone.trim(), email?.trim() || '', 0, null]
-      );
-      
-      return sendSuccess(res, result.rows[0], 'Kunde erfolgreich erstellt');
-    }
-
-    // Update customer
-    if (path.startsWith('/customers/') && method === 'PUT') {
-      const customerId = path.split('/')[2];
-      const { name, phone, email } = req.body;
-      
-      if (!validateName(name)) {
-        return sendError(res, 400, 'Gültiger Name ist erforderlich');
-      }
-      
-      if (!validatePhone(phone)) {
-        return sendError(res, 400, 'Gültige Telefonnummer ist erforderlich');
-      }
-      
-      if (email && email.trim() && !validateEmail(email)) {
-        return sendError(res, 400, 'Gültige E-Mail-Adresse ist erforderlich');
-      }
-
-      const result = await pool.query(
-        'UPDATE customers SET name = $1, phone = $2, email = $3 WHERE id = $4 AND user_id = $5 RETURNING *',
-        [name.trim(), phone.trim(), email?.trim() || '', customerId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Kunde nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Kunde erfolgreich aktualisiert');
-    }
-
-    // Delete customer
-    if (path.startsWith('/customers/') && method === 'DELETE') {
-      const customerId = path.split('/')[2];
-      
-      const client = await pool.connect();
       
       try {
-        await client.query('BEGIN');
-        
-        // Cancel appointments with this customer
-        await client.query(
-          'UPDATE appointments SET status = $1 WHERE customer_id = $2 AND user_id = $3',
-          ['cancelled', customerId, userId]
+        const result = await pool.query(
+          'INSERT INTO customers (user_id, name, email, phone, total_visits, last_visit) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+          [userId, name, email || '', phone || '', 0, null]
         );
         
-        // Delete customer
-        const result = await client.query(
-          'DELETE FROM customers WHERE id = $1 AND user_id = $2 RETURNING *',
-          [customerId, userId]
-        );
-        
-        if (result.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return sendError(res, 404, 'Kunde nicht gefunden');
-        }
-        
-        await client.query('COMMIT');
-        return sendSuccess(res, {}, 'Kunde erfolgreich gelöscht');
-        
+        return sendResponse(res, 201, result.rows[0]);
       } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
+        return sendError(res, 500, 'Kunde konnte nicht erstellt werden', error.message);
       }
     }
 
-    // ==================== APPOINTMENTS ROUTES ====================
-    
-    // Get all appointments
+    // Appointments - GET
     if (path === '/appointments' && method === 'GET') {
-      const result = await pool.query(`
-        SELECT 
-          a.*,
-          c.name as customer_name, 
-          c.phone as customer_phone, 
-          c.email as customer_email,
-          s.name as staff_name,
-          sv.name as service_name, 
-          sv.price as service_price, 
-          sv.duration as service_duration,
-          sv.icon as service_icon
-        FROM appointments a
-        JOIN customers c ON a.customer_id = c.id
-        JOIN staff s ON a.staff_id = s.id  
-        JOIN services sv ON a.service_id = sv.id
-        WHERE a.user_id = $1
-        ORDER BY a.appointment_date DESC, a.appointment_time DESC
-      `, [userId]);
-      
-      return sendSuccess(res, result.rows);
+      try {
+        const result = await pool.query(`
+          SELECT 
+            a.*,
+            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+            s.name as staff_name,
+            sv.name as service_name, sv.price as service_price, sv.duration as service_duration
+          FROM appointments a
+          JOIN customers c ON a.customer_id = c.id
+          JOIN staff s ON a.staff_id = s.id  
+          JOIN services sv ON a.service_id = sv.id
+          WHERE a.user_id = $1
+          ORDER BY a.appointment_date DESC, a.appointment_time DESC
+        `, [userId]);
+        
+        return sendResponse(res, 200, result.rows);
+      } catch (error) {
+        return sendError(res, 500, 'Termine konnten nicht geladen werden', error.message);
+      }
     }
 
-    // Get appointments by date
+    // Appointments - POST
+    if (path === '/appointments' && method === 'POST') {
+      const { customer_id, service_id, staff_id, appointment_date, appointment_time, notes } = req.body;
+      
+      if (!customer_id || !service_id || !staff_id || !appointment_date || !appointment_time) {
+        return sendError(res, 400, 'Alle Pflichtfelder sind erforderlich');
+      }
+      
+      try {
+        const result = await pool.query(
+          'INSERT INTO appointments (user_id, customer_id, service_id, staff_id, appointment_date, appointment_time, notes, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+          [userId, customer_id, service_id, staff_id, appointment_date, appointment_time, notes || '', 'confirmed']
+        );
+        
+        return sendResponse(res, 201, result.rows[0]);
+      } catch (error) {
+        return sendError(res, 500, 'Termin konnte nicht erstellt werden', error.message);
+      }
+    }
+
+    // Appointments by Date
     if (path.startsWith('/appointments/date/') && method === 'GET') {
       const date = path.split('/')[3];
       
-      const result = await pool.query(`
-        SELECT 
-          a.*,
-          c.name as customer_name, 
-          c.phone as customer_phone, 
-          c.email as customer_email,
-          s.name as staff_name,
-          sv.name as service_name, 
-          sv.price as service_price, 
-          sv.duration as service_duration
-        FROM appointments a
-        JOIN customers c ON a.customer_id = c.id
-        JOIN staff s ON a.staff_id = s.id  
-        JOIN services sv ON a.service_id = sv.id
-        WHERE a.user_id = $1 AND a.appointment_date = $2
-        ORDER BY a.appointment_time ASC
-      `, [userId, date]);
-      
-      return sendSuccess(res, result.rows);
-    }
-
-    // Create appointment
-    if (path === '/appointments' && method === 'POST') {
-      const { customer_id, staff_id, service_id, appointment_date, appointment_time } = req.body;
-      
-      if (!customer_id || !staff_id || !service_id || !appointment_date || !appointment_time) {
-        return sendError(res, 400, 'Alle Termin-Daten sind erforderlich');
-      }
-
-      const client = await pool.connect();
-      
       try {
-        await client.query('BEGIN');
+        const result = await pool.query(`
+          SELECT 
+            a.*,
+            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+            s.name as staff_name,
+            sv.name as service_name, sv.price as service_price, sv.duration as service_duration
+          FROM appointments a
+          JOIN customers c ON a.customer_id = c.id
+          JOIN staff s ON a.staff_id = s.id  
+          JOIN services sv ON a.service_id = sv.id
+          WHERE a.user_id = $1 AND a.appointment_date = $2
+          ORDER BY a.appointment_time ASC
+        `, [userId, date]);
         
-        // Check if time slot is available
-        const existingAppointment = await client.query(
-          'SELECT id FROM appointments WHERE user_id = $1 AND staff_id = $2 AND appointment_date = $3 AND appointment_time = $4 AND status != $5',
-          [userId, staff_id, appointment_date, appointment_time, 'cancelled']
-        );
-        
-        if (existingAppointment.rows.length > 0) {
-          await client.query('ROLLBACK');
-          return sendError(res, 409, 'Dieser Zeitslot ist bereits belegt');
-        }
-        
-        // Create appointment
-        const result = await client.query(
-          'INSERT INTO appointments (user_id, customer_id, staff_id, service_id, appointment_date, appointment_time, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-          [userId, customer_id, staff_id, service_id, appointment_date, appointment_time, 'confirmed']
-        );
-        
-        // Update customer statistics
-        await client.query(
-          'UPDATE customers SET total_visits = total_visits + 1, last_visit = $1 WHERE id = $2 AND user_id = $3',
-          [appointment_date, customer_id, userId]
-        );
-        
-        await client.query('COMMIT');
-        
-        console.log(`✅ Appointment created: ${appointment_date} ${appointment_time}`);
-        return sendSuccess(res, result.rows[0], 'Termin erfolgreich gebucht');
-        
+        return sendResponse(res, 200, result.rows);
       } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
+        return sendError(res, 500, 'Termine konnten nicht geladen werden', error.message);
       }
     }
 
-    // Update appointment status
-    if (path.startsWith('/appointments/') && path.includes('/cancel') && method === 'PUT') {
-      const appointmentId = path.split('/')[2];
-      
-      const result = await pool.query(
-        'UPDATE appointments SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-        ['cancelled', appointmentId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Termin nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Termin erfolgreich storniert');
-    }
-
-    if (path.startsWith('/appointments/') && path.includes('/confirm') && method === 'PUT') {
-      const appointmentId = path.split('/')[2];
-      
-      const result = await pool.query(
-        'UPDATE appointments SET status = $1 WHERE id = $2 AND user_id = $3 RETURNING *',
-        ['confirmed', appointmentId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Termin nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Termin erfolgreich bestätigt');
-    }
-
-    // Update appointment
-    if (path.startsWith('/appointments/') && method === 'PUT') {
-      const appointmentId = path.split('/')[2];
-      const { appointment_date, appointment_time, status } = req.body;
-      
-      const result = await pool.query(
-        'UPDATE appointments SET appointment_date = COALESCE($1, appointment_date), appointment_time = COALESCE($2, appointment_time), status = COALESCE($3, status) WHERE id = $4 AND user_id = $5 RETURNING *',
-        [appointment_date, appointment_time, status, appointmentId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Termin nicht gefunden');
-      }
-      
-      return sendSuccess(res, result.rows[0], 'Termin erfolgreich aktualisiert');
-    }
-
-    // Delete appointment
-    if (path.startsWith('/appointments/') && method === 'DELETE') {
-      const appointmentId = path.split('/')[2];
-      
-      const result = await pool.query(
-        'DELETE FROM appointments WHERE id = $1 AND user_id = $2 RETURNING *',
-        [appointmentId, userId]
-      );
-      
-      if (result.rows.length === 0) {
-        return sendError(res, 404, 'Termin nicht gefunden');
-      }
-      
-      return sendSuccess(res, {}, 'Termin erfolgreich gelöscht');
-    }
-
-    // ==================== 404 - ROUTE NOT FOUND ====================
-    return sendError(res, 404, `Endpoint nicht gefunden: ${method} ${path}`, {
-      availableEndpoints: ['/health', '/register', '/login', '/dashboard', '/services', '/staff', '/customers', '/appointments']
-    });
+    // ==================== 404 ====================
+    return sendError(res, 404, `Endpoint nicht gefunden: ${method} ${path}`);
 
   } catch (error) {
-    console.error('❌ API Error:', {
-      method,
-      path,
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
+    debugLog('Unhandled error:', error.message);
+    console.error('Full error stack:', error.stack);
+    
+    return sendError(res, 500, 'Ein unerwarteter Serverfehler ist aufgetreten', {
+      message: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
     });
-    
-    // Handle specific error types
-    if (error.message.includes('Token') || error.message.includes('JWT')) {
-      return sendError(res, 401, error.message);
-    }
-    
-    if (error.code === '23505') { // PostgreSQL unique violation
-      return sendError(res, 409, 'Datensatz bereits vorhanden');
-    }
-    
-    if (error.code === '23503') { // PostgreSQL foreign key violation
-      return sendError(res, 400, 'Referenzierter Datensatz nicht gefunden');
-    }
-    
-    if (error.code === '23502') { // PostgreSQL not null violation
-      return sendError(res, 400, 'Erforderliche Felder fehlen');
-    }
-    
-    // Database connection errors
-    if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND') {
-      return sendError(res, 503, 'Datenbankverbindung fehlgeschlagen');
-    }
-    
-    // Generic server error
-    return sendError(res, 500, 'Interner Serverfehler', process.env.NODE_ENV !== 'production' ? error.message : null);
   }
 };
-
-// ==================== GRACEFUL SHUTDOWN ====================
-process.on('SIGINT', async () => {
-  console.log('🛑 Graceful shutdown initiated...');
-  try {
-    await pool.end();
-    console.log('✅ Database connections closed');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error during shutdown:', error);
-    process.exit(1);
-  }
-});
-
-process.on('SIGTERM', async () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully...');
-  try {
-    await pool.end();
-    console.log('✅ Database connections closed');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Error during shutdown:', error);
-    process.exit(1);
-  }
-});
-
-console.log('✅ ProfiSlots API Server loaded and ready');
