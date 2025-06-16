@@ -83,6 +83,12 @@
         </div>
     </div>
 
+    <!-- Global Variables for Browser -->
+    <script>
+        // Define process.env for browser compatibility
+        window.process = window.process || { env: { NODE_ENV: 'production' } };
+    </script>
+
     <!-- Module Scripts (Load Order Important!) -->
     <script src="/js/utils.js"></script>
     <script src="/js/api.js"></script>
@@ -91,10 +97,6 @@
     <script type="text/babel" src="/js/auth.js"></script>
     <script type="text/babel" src="/js/dashboard.js"></script>
     <script type="text/babel" src="/js/booking.js"></script>
-    <script type="text/babel" src="/js/appointments.js"></script>
-    <script type="text/babel" src="/js/customers.js"></script>
-    <script type="text/babel" src="/js/services.js"></script>
-    <script type="text/babel" src="/js/staff.js"></script>
     <script type="text/babel" src="/js/app.js"></script>
 
     <!-- Global Error Handler -->
