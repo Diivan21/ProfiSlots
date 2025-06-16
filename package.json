@@ -1,44 +1,31 @@
 {
   "name": "profislots",
   "version": "1.0.0",
-  "description": "Professionelles Terminbuchungssystem für Friseure, Handwerker und Selbstständige",
-  "private": true,
+  "description": "ProfiSlots Terminbuchungssystem - Modular & Wartbar",
+  "main": "api/index.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "db:generate": "supabase gen types typescript --project-id salojgcuhikdyypjerkm > types/supabase.ts",
-    "db:push": "supabase db push",
-    "db:reset": "supabase db reset"
+    "start": "node api/index.js",
+    "dev": "node api/index.js",
+    "build": "echo 'Static build - no build step needed'",
+    "test": "echo 'Tests coming soon'"
   },
   "dependencies": {
-    "next": "14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.38.0",
-    "@supabase/auth-helpers-nextjs": "^0.8.7",
-    "@supabase/auth-ui-react": "^0.4.6",
-    "@supabase/auth-ui-shared": "^0.1.8",
-    "lucide-react": "^0.294.0",
-    "tailwindcss": "^3.3.6",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
-    "date-fns": "^2.30.0",
-    "react-hot-toast": "^2.4.1",
-    "uuid": "^9.0.1",
-    "@types/uuid": "^9.0.7"
-  },
-  "devDependencies": {
-    "typescript": "^5.2.2",
-    "@types/node": "^20.8.10",
-    "@types/react": "^18.2.37",
-    "@types/react-dom": "^18.2.15",
-    "eslint": "^8.53.0",
-    "eslint-config-next": "14.0.0",
-    "supabase": "^1.110.0"
+    "pg": "^8.11.3",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1"
   },
   "engines": {
-    "node": ">=18.0.0"
-  }
+    "node": "18.x"
+  },
+  "keywords": [
+    "terminbuchung",
+    "friseur",
+    "handwerker",
+    "appointment",
+    "booking"
+  ],
+  "author": "ProfiSlots",
+  "license": "MIT"
 }
