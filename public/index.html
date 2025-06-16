@@ -19,107 +19,50 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Mock API für Demo - ersetzt localStorage
-        const MockAPI = {
-            users: new Map(),
-            currentUser: null,
-            token: null,
+        // API Helper
+        const API_URL = '/api';
 
+        const api = {
             async request(endpoint, options = {}) {
-                // Simuliere Netzwerk-Delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                const config = {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(this.token && { Authorization: `Bearer ${this.token}` })
-                    },
-                    ...options
-                };
-
-                if (endpoint === '/login' && options.method === 'POST') {
-                    const { email, password } = options.body;
-                    const user = this.users.get(email.toLowerCase());
-                    
-                    if (!user || user.password !== password) {
-                        throw new Error('E-Mail oder Passwort ist falsch');
-                    }
-                    
-                    this.token = 'mock_token_' + Date.now();
-                    this.currentUser = user;
-                    
-                    return {
-                        token: this.token,
-                        user: { id: user.id, email: user.email, salonName: user.salonName }
+                try {
+                    const token = localStorage.getItem('token');
+                    const config = {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token && { Authorization: `Bearer ${token}` })
+                        },
+                        ...options
                     };
-                }
 
-                if (endpoint === '/register' && options.method === 'POST') {
-                    const { email, password, salonName } = options.body;
-                    
-                    if (this.users.has(email.toLowerCase())) {
-                        throw new Error('Diese E-Mail ist bereits registriert');
+                    if (config.body && typeof config.body === 'object') {
+                        config.body = JSON.stringify(config.body);
                     }
+
+                    const response = await fetch(API_URL + endpoint, config);
                     
-                    if (password.length < 6) {
-                        throw new Error('Passwort muss mindestens 6 Zeichen haben');
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.error || `HTTP ${response.status}`);
                     }
-                    
-                    const newUser = {
-                        id: Date.now(),
-                        email: email.toLowerCase(),
-                        password,
-                        salonName,
-                        appointments: [],
-                        customers: [],
-                        services: [
-                            { id: 1, name: 'Haarschnitt', duration: 60, price: 45.00 },
-                            { id: 2, name: 'Färbung', duration: 120, price: 80.00 },
-                            { id: 3, name: 'Massage (60 Min)', duration: 60, price: 65.00 },
-                            { id: 4, name: 'Beratung', duration: 30, price: 35.00 }
-                        ]
-                    };
-                    
-                    this.users.set(email.toLowerCase(), newUser);
-                    return { message: 'Account erfolgreich erstellt!' };
-                }
 
-                if (endpoint === '/dashboard' && this.currentUser) {
-                    const today = new Date().toDateString();
-                    const todayAppointments = this.currentUser.appointments.filter(
-                        apt => apt.date === today && apt.status !== 'cancelled'
-                    ).length;
-                    
-                    return {
-                        todayAppointments,
-                        totalCustomers: this.currentUser.customers.length,
-                        totalServices: this.currentUser.services.length
-                    };
+                    return await response.json();
+                } catch (error) {
+                    console.error('API Error:', error);
+                    throw error;
                 }
-
-                if (!this.token) {
-                    throw new Error('Nicht authentifiziert');
-                }
-
-                throw new Error('Endpoint nicht gefunden');
             },
 
-            login: (email, password) => MockAPI.request('/login', {
+            login: (email, password) => api.request('/login', {
                 method: 'POST',
                 body: { email, password }
             }),
 
-            register: (email, password, salonName) => MockAPI.request('/register', {
+            register: (email, password, salonName) => api.request('/register', {
                 method: 'POST',
                 body: { email, password, salonName }
             }),
 
-            getDashboard: () => MockAPI.request('/dashboard'),
-
-            logout: () => {
-                MockAPI.token = null;
-                MockAPI.currentUser = null;
-            }
+            getDashboard: () => api.request('/dashboard')
         };
 
         // Login Component
@@ -138,13 +81,16 @@
 
                 try {
                     if (isLogin) {
-                        const result = await MockAPI.login(email, password);
+                        const result = await api.login(email, password);
+                        localStorage.setItem('token', result.token);
+                        localStorage.setItem('user', JSON.stringify(result.user));
                         onLogin(result.user);
                     } else {
-                        await MockAPI.register(email, password, salonName);
+                        await api.register(email, password, salonName);
                         alert('✅ Account erfolgreich erstellt! Bitte loggen Sie sich ein.');
                         setIsLogin(true);
                         setError('');
+                        // Felder leeren
                         setEmail('');
                         setPassword('');
                         setSalonName('');
@@ -278,7 +224,7 @@
             useEffect(() => {
                 const loadDashboard = async () => {
                     try {
-                        const data = await MockAPI.getDashboard();
+                        const data = await api.getDashboard();
                         setStats(data);
                     } catch (error) {
                         console.error('Dashboard Error:', error);
@@ -288,11 +234,6 @@
                 };
                 loadDashboard();
             }, []);
-
-            const handleLogout = () => {
-                MockAPI.logout();
-                onLogout();
-            };
 
             return (
                 <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -312,7 +253,7 @@
                                     </div>
                                 </div>
                                 <button
-                                    onClick={handleLogout}
+                                    onClick={onLogout}
                                     className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
                                 >
                                     Abmelden
@@ -383,16 +324,17 @@
                                 </div>
                             </div>
 
-                            {/* Status */}
+                            {/* Success Message */}
                             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                                 <div className="flex">
                                     <svg className="w-5 h-5 text-green-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
                                     <div>
-                                        <h4 className="font-medium text-green-800">✅ System funktioniert jetzt!</h4>
+                                        <h4 className="font-medium text-green-800">🎉 System erfolgreich online!</h4>
                                         <p className="text-green-700 text-sm mt-1">
-                                            Das localStorage-Problem wurde behoben. ProfiSlots läuft jetzt vollständig funktionsfähig!
+                                            Ihr ProfiSlots Terminbuchungssystem läuft jetzt erfolgreich auf Vercel mit Supabase-Datenbank. 
+                                            Das vollständige Frontend wird schrittweise erweitert.
                                         </p>
                                     </div>
                                 </div>
@@ -406,13 +348,31 @@
         // Main App Component
         const App = () => {
             const [user, setUser] = useState(null);
-            const [loading, setLoading] = useState(false);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const token = localStorage.getItem('token');
+                const savedUser = localStorage.getItem('user');
+                
+                if (token && savedUser) {
+                    try {
+                        setUser(JSON.parse(savedUser));
+                    } catch (e) {
+                        console.error('Invalid user data:', e);
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                    }
+                }
+                setLoading(false);
+            }, []);
 
             const handleLogin = (userData) => {
                 setUser(userData);
             };
 
             const handleLogout = () => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
                 setUser(null);
             };
 
