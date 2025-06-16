@@ -5,33 +5,64 @@ const { useState, useEffect } = React;
 
 const App = () => {
   // Auth State
-  const { user, loading: authLoading, login, logout, isAuthenticated } = ProfiSlots.useAuth();
+  const [authState, setAuthState] = useState({
+    user: null,
+    loading: true,
+    isAuthenticated: false
+  });
   
   // App State
   const [currentView, setCurrentView] = useState('dashboard');
   const [appLoading, setAppLoading] = useState(true);
   const [systemStatus, setSystemStatus] = useState('online');
 
-  // Initial App Setup
+  // Auth Hook - vereinfacht
   useEffect(() => {
-    initializeApp();
+    const checkAuth = () => {
+      try {
+        const token = ProfiSlots.Storage.get('token');
+        const savedUser = ProfiSlots.Storage.get('user');
+        
+        if (token && savedUser) {
+          setAuthState({
+            user: savedUser,
+            loading: false,
+            isAuthenticated: true
+          });
+        } else {
+          setAuthState({
+            user: null,
+            loading: false,
+            isAuthenticated: false
+          });
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        ProfiSlots.Storage.remove('token');
+        ProfiSlots.Storage.remove('user');
+        setAuthState({
+          user: null,
+          loading: false,
+          isAuthenticated: false
+        });
+      }
+    };
+
+    checkAuth();
   }, []);
 
-  // Check auth status changes
+  // Initial App Setup
   useEffect(() => {
-    if (!authLoading) {
-      setAppLoading(false);
+    if (!authState.loading) {
+      initializeApp();
     }
-  }, [authLoading]);
+  }, [authState.loading]);
 
   // App Initialization
   const initializeApp = async () => {
     try {
       // Check system health
       await checkSystemHealth();
-      
-      // Load any global settings
-      await loadAppSettings();
       
       console.log('✅ ProfiSlots App initialized successfully');
     } catch (error) {
@@ -52,14 +83,6 @@ const App = () => {
     }
   };
 
-  const loadAppSettings = async () => {
-    // Load any global app settings from localStorage or API
-    const savedView = ProfiSlots.Storage.get('lastView');
-    if (savedView && isValidView(savedView)) {
-      setCurrentView(savedView);
-    }
-  };
-
   // View Management
   const isValidView = (view) => {
     const validViews = ['dashboard', 'booking', 'appointments', 'customers', 'services', 'staff'];
@@ -70,10 +93,7 @@ const App = () => {
     if (isValidView(newView)) {
       setCurrentView(newView);
       ProfiSlots.Storage.set('lastView', newView);
-      
-      // Scroll to top on view change
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      
       console.log(`📍 View changed to: ${newView}`);
     } else {
       console.error('Invalid view:', newView);
@@ -82,13 +102,22 @@ const App = () => {
 
   // Auth Handlers
   const handleLogin = (userData) => {
-    login(userData);
+    setAuthState({
+      user: userData,
+      loading: false,
+      isAuthenticated: true
+    });
     setCurrentView('dashboard');
     showSuccess(`Willkommen zurück, ${userData.salonName}!`);
   };
 
   const handleLogout = () => {
-    logout();
+    ProfiSlots.API.auth.logout();
+    setAuthState({
+      user: null,
+      loading: false,
+      isAuthenticated: false
+    });
     setCurrentView('dashboard');
     ProfiSlots.Storage.remove('lastView');
     showSuccess('Erfolgreich abgemeldet');
@@ -96,14 +125,14 @@ const App = () => {
 
   // Render Current View Component
   const renderCurrentView = () => {
-    if (!isAuthenticated) {
+    if (!authState.isAuthenticated) {
       return React.createElement(ProfiSlots.AuthPage, {
         onLogin: handleLogin
       });
     }
 
     const commonProps = {
-      user,
+      user: authState.user,
       onViewChange: handleViewChange
     };
 
@@ -115,74 +144,17 @@ const App = () => {
         return React.createElement(ProfiSlots.BookingPage, commonProps);
       
       case 'appointments':
-        // Temporärer Platzhalter - wird durch echte Komponente ersetzt
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '📅 Terminverwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
       case 'customers':
-        // Temporärer Platzhalter
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '👥 Kundenverwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
       case 'services':
-        // Temporärer Platzhalter
-        return React.createElement('div', {
-          className: "container-main py-8 text-center"
-        }, [
-          React.createElement('h1', {
-            key: 'title',
-            className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '⚙️ Service-Verwaltung'),
-          React.createElement('p', {
-            key: 'message',
-            className: "text-gray-600 mb-6"
-          }, 'Diese Seite wird gerade entwickelt.'),
-          React.createElement('button', {
-            key: 'back-button',
-            onClick: () => handleViewChange('dashboard'),
-            className: "btn-primary"
-          }, 'Zurück zum Dashboard')
-        ]);
-      
       case 'staff':
-        // Temporärer Platzhalter
+        // Temporäre Platzhalter
         return React.createElement('div', {
           className: "container-main py-8 text-center"
         }, [
           React.createElement('h1', {
             key: 'title',
             className: "text-2xl font-bold text-gray-800 mb-4"
-          }, '👨‍💼 Mitarbeiter-Verwaltung'),
+          }, `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} - Coming Soon`),
           React.createElement('p', {
             key: 'message',
             className: "text-gray-600 mb-6"
@@ -195,7 +167,6 @@ const App = () => {
         ]);
       
       default:
-        console.error('Unknown view:', currentView);
         return React.createElement('div', {
           className: "container-main py-8 text-center"
         }, [
@@ -217,7 +188,7 @@ const App = () => {
   };
 
   // Loading Screen
-  if (appLoading || authLoading) {
+  if (appLoading || authState.loading) {
     return React.createElement('div', {
       className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center"
     }, [
@@ -247,7 +218,6 @@ const App = () => {
           className: "text-gray-600"
         }, 'Terminbuchungssystem wird geladen...'),
         
-        // System Status Indicator
         systemStatus !== 'online' && React.createElement('div', {
           key: 'system-status',
           className: `mt-4 p-3 rounded-lg ${
@@ -300,7 +270,7 @@ const App = () => {
         React.createElement('p', {
           key: 'error-message',
           className: "text-gray-600 mb-6"
-        }, 'Es gab ein Problem beim Laden von ProfiSlots. Bitte versuchen Sie es später erneut oder kontaktieren Sie den Support.'),
+        }, 'Es gab ein Problem beim Laden von ProfiSlots. Bitte versuchen Sie es später erneut.'),
         React.createElement('button', {
           key: 'retry-button',
           onClick: () => window.location.reload(),
@@ -315,9 +285,9 @@ const App = () => {
     className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100"
   }, [
     // Header (nur wenn authentifiziert)
-    isAuthenticated && React.createElement(ProfiSlots.Header, {
+    authState.isAuthenticated && React.createElement(ProfiSlots.Header, {
       key: 'header',
-      user,
+      user: authState.user,
       onLogout: handleLogout,
       currentView,
       onViewChange: handleViewChange
@@ -326,13 +296,13 @@ const App = () => {
     // Main Content
     React.createElement('main', {
       key: 'main-content',
-      className: isAuthenticated ? 'pb-8' : ''
+      className: authState.isAuthenticated ? 'pb-8' : ''
     }, [
       renderCurrentView()
     ]),
 
     // Footer (nur wenn authentifiziert)
-    isAuthenticated && React.createElement('footer', {
+    authState.isAuthenticated && React.createElement('footer', {
       key: 'footer',
       className: "bg-white border-t border-gray-200 py-6 mt-8"
     }, [
@@ -360,7 +330,7 @@ const App = () => {
             React.createElement('span', {
               key: 'footer-text',
               className: "text-gray-600 text-sm"
-            }, `© 2024 ProfiSlots - ${user?.salonName}`)
+            }, `© 2024 ProfiSlots - ${authState.user?.salonName || 'Salon'}`)
           ]),
           React.createElement('div', {
             key: 'footer-status',
@@ -408,9 +378,10 @@ class ErrorBoundary extends React.Component {
       errorInfo: errorInfo
     });
     
-    // Log error to console and error tracking service
     console.error('React Error Boundary caught an error:', error, errorInfo);
-    ProfiSlots.ErrorHandler.log(error, 'React Error Boundary');
+    if (window.ProfiSlots && window.ProfiSlots.ErrorHandler) {
+      ProfiSlots.ErrorHandler.log(error, 'React Error Boundary');
+    }
   }
 
   render() {
@@ -426,10 +397,10 @@ class ErrorBoundary extends React.Component {
             key: 'error-icon',
             className: "w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"
           }, [
-            React.createElement(lucide.AlertTriangle, {
-              key: 'error-icon-svg',
-              className: "w-8 h-8 text-red-600"
-            })
+            React.createElement('div', {
+              key: 'error-icon-text',
+              className: "text-2xl"
+            }, '⚠️')
           ]),
           React.createElement('h1', {
             key: 'error-title',
@@ -438,26 +409,7 @@ class ErrorBoundary extends React.Component {
           React.createElement('p', {
             key: 'error-message',
             className: "text-gray-600 mb-6 text-center"
-          }, 'Es ist ein unerwarteter Fehler in der Anwendung aufgetreten. Bitte laden Sie die Seite neu oder kontaktieren Sie den Support.'),
-          
-          // Error Details (nur in Development)
-          typeof window !== 'undefined' && window.location.hostname === 'localhost' && React.createElement('details', {
-            key: 'error-details',
-            className: "mb-6 p-4 bg-gray-50 rounded-lg"
-          }, [
-            React.createElement('summary', {
-              key: 'error-summary',
-              className: "cursor-pointer font-medium text-gray-700 mb-2"
-            }, 'Fehlerdetails (Development)'),
-            React.createElement('pre', {
-              key: 'error-stack',
-              className: "text-xs text-gray-600 overflow-auto"
-            }, this.state.error ? this.state.error.toString() : 'No error details'),
-            React.createElement('pre', {
-              key: 'error-component-stack',
-              className: "text-xs text-gray-600 overflow-auto mt-2"
-            }, this.state.errorInfo ? this.state.errorInfo.componentStack : 'No component stack')
-          ]),
+          }, 'Es ist ein unerwarteter Fehler in der Anwendung aufgetreten.'),
           
           React.createElement('div', {
             key: 'error-actions',
@@ -471,7 +423,9 @@ class ErrorBoundary extends React.Component {
             React.createElement('button', {
               key: 'reset-button',
               onClick: () => {
-                ProfiSlots.Storage.clear();
+                if (window.ProfiSlots && window.ProfiSlots.Storage) {
+                  ProfiSlots.Storage.clear();
+                }
                 window.location.reload();
               },
               className: "flex-1 btn-secondary"
@@ -492,7 +446,9 @@ const initializeProfiSlots = () => {
   // Check if React is available
   if (!window.React || !window.ReactDOM) {
     console.error('❌ React or ReactDOM not loaded');
-    showError('React wurde nicht geladen. Bitte laden Sie die Seite neu.');
+    if (window.showError) {
+      showError('React wurde nicht geladen. Bitte laden Sie die Seite neu.');
+    }
     return;
   }
   
@@ -501,7 +457,9 @@ const initializeProfiSlots = () => {
   // Check if lucide is available
   if (!window.lucide) {
     console.error('❌ Lucide icons not loaded');
-    showError('Icons wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    if (window.showError) {
+      showError('Icons wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    }
     return;
   }
   
@@ -510,7 +468,9 @@ const initializeProfiSlots = () => {
   // Check if ProfiSlots namespace exists
   if (!window.ProfiSlots) {
     console.error('❌ ProfiSlots namespace not found');
-    showError('ProfiSlots Module wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    if (window.showError) {
+      showError('ProfiSlots Module wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    }
     return;
   }
   
@@ -522,14 +482,12 @@ const initializeProfiSlots = () => {
     'ProfiSlots.AuthPage', 
     'ProfiSlots.Dashboard',
     'ProfiSlots.BookingPage',
-    'ProfiSlots.useAuth',
     'ProfiSlots.API'
   ];
 
   console.log('🔍 Checking required components...');
   
   const missingComponents = requiredComponents.filter(component => {
-    // Sicherer Check für verfügbare Komponenten
     const parts = component.split('.');
     let obj = window;
     
@@ -538,7 +496,7 @@ const initializeProfiSlots = () => {
         obj = obj[part];
       } else {
         console.log(`❌ Missing component: ${component} (failed at ${part})`);
-        return true; // Component missing
+        return true;
       }
     }
     
@@ -549,33 +507,31 @@ const initializeProfiSlots = () => {
 
   if (missingComponents.length > 0) {
     console.error('❌ Missing required components:', missingComponents);
-    
-    // More detailed debugging
     console.log('Available ProfiSlots components:', Object.keys(window.ProfiSlots || {}));
     
-    showError('Fehler beim Laden der Anwendung. Fehlende Komponenten: ' + missingComponents.join(', '));
+    if (window.showError) {
+      showError('Fehler beim Laden der Anwendung. Fehlende Komponenten: ' + missingComponents.join(', '));
+    }
     return;
   }
 
-  // All components loaded, render the app
   console.log('🚀 All components loaded, starting ProfiSlots...');
   
   const appContainer = document.getElementById('app');
   if (!appContainer) {
     console.error('❌ App container not found');
-    showError('App Container nicht gefunden');
+    if (window.showError) {
+      showError('App Container nicht gefunden');
+    }
     return;
   }
 
   console.log('✅ App container found');
 
   try {
-    // Clear loading screen
     appContainer.innerHTML = '';
-
     console.log('🎨 Rendering React app...');
 
-    // Render app with error boundary
     ReactDOM.render(
       React.createElement(ErrorBoundary, {}, [
         React.createElement(App, { key: 'app' })
@@ -586,37 +542,38 @@ const initializeProfiSlots = () => {
     console.log('✅ ProfiSlots App started successfully');
   } catch (error) {
     console.error('❌ Error rendering app:', error);
-    showError('Fehler beim Rendern der App: ' + error.message);
+    if (window.showError) {
+      showError('Fehler beim Rendern der App: ' + error.message);
+    }
   }
 };
 
 // ==================== STARTUP ====================
-// Wait for DOM to be ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeProfiSlots);
 } else {
-  // DOM is already ready
   initializeProfiSlots();
 }
 
 // Global error handlers
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
-  ProfiSlots.ErrorHandler.log(event.reason, 'Unhandled Promise Rejection');
-  
-  // Prevent the default browser behavior
+  if (window.ProfiSlots && window.ProfiSlots.ErrorHandler) {
+    ProfiSlots.ErrorHandler.log(event.reason, 'Unhandled Promise Rejection');
+  }
   event.preventDefault();
-  
-  // Show user-friendly error message
-  showError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+  if (window.showError) {
+    showError('Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+  }
 });
 
 window.addEventListener('error', (event) => {
   console.error('Global error:', event.error);
-  ProfiSlots.ErrorHandler.log(event.error, 'Global Error Handler');
+  if (window.ProfiSlots && window.ProfiSlots.ErrorHandler) {
+    ProfiSlots.ErrorHandler.log(event.error, 'Global Error Handler');
+  }
   
-  // Show user-friendly error message for critical errors
-  if (event.error && event.error.message) {
+  if (event.error && event.error.message && window.showError) {
     showError('Ein Systemfehler ist aufgetreten. Bitte laden Sie die Seite neu.');
   }
 });
