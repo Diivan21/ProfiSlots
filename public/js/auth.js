@@ -287,7 +287,11 @@ const AuthPage = ({ onLogin }) => {
           React.createElement('span', {
             key: 'loading-text'
           }, 'Wird verarbeitet...')
-        ] : (isLogin ? 'Anmelden' : 'Account erstellen'))
+        ] : [
+          React.createElement('span', {
+            key: 'auth-text'
+          }, isLogin ? 'Anmelden' : 'Account erstellen')
+        ])
       ]),
 
       // Toggle Auth Mode
