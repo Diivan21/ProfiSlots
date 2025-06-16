@@ -11,8 +11,8 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     
     <!-- External Libraries -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -20,7 +20,7 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/public/css/styles.css">
     
     <!-- Tailwind Config -->
     <script>
@@ -87,17 +87,36 @@
     <script>
         // Define process.env for browser compatibility
         window.process = window.process || { env: { NODE_ENV: 'production' } };
+        
+        // Define global notification functions
+        window.showError = window.showError || function(message) {
+            console.error('Error:', message);
+            alert('Fehler: ' + message);
+        };
+        
+        window.showSuccess = window.showSuccess || function(message) {
+            console.log('Success:', message);
+            // alert('Erfolg: ' + message);
+        };
+        
+        window.hideError = window.hideError || function() {
+            console.log('Hide error called');
+        };
+        
+        window.hideSuccess = window.hideSuccess || function() {
+            console.log('Hide success called');
+        };
     </script>
 
     <!-- Module Scripts (Load Order Important!) -->
-    <script src="/js/utils.js"></script>
-    <script src="/js/api.js"></script>
-    <script type="text/babel" src="/js/components/header.js"></script>
-    <script type="text/babel" src="/js/components/modals.js"></script>
-    <script type="text/babel" src="/js/auth.js"></script>
-    <script type="text/babel" src="/js/dashboard.js"></script>
-    <script type="text/babel" src="/js/booking.js"></script>
-    <script type="text/babel" src="/js/app.js"></script>
+    <script src="/public/js/utils.js"></script>
+    <script src="/public/js/api.js"></script>
+    <script type="text/babel" src="/public/js/components/header.js"></script>
+    <script type="text/babel" src="/public/js/components/modals.js"></script>
+    <script type="text/babel" src="/public/js/auth.js"></script>
+    <script type="text/babel" src="/public/js/dashboard.js"></script>
+    <script type="text/babel" src="/public/js/booking.js"></script>
+    <script type="text/babel" src="/public/js/app.js"></script>
 
     <!-- Global Error Handler -->
     <script>
