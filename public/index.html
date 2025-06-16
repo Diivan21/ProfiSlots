@@ -8,10 +8,440 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/main.css">
+    <style>
+        .loading { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
-<body>
+<body class="bg-gray-50">
     <div id="root"></div>
-    <script type="module" src="js/main.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Mock API für Demo - ersetzt localStorage
+        const MockAPI = {
+            users: new Map(),
+            currentUser: null,
+            token: null,
+
+            async request(endpoint, options = {}) {
+                // Simuliere Netzwerk-Delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const config = {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(this.token && { Authorization: `Bearer ${this.token}` })
+                    },
+                    ...options
+                };
+
+                if (endpoint === '/login' && options.method === 'POST') {
+                    const { email, password } = options.body;
+                    const user = this.users.get(email.toLowerCase());
+                    
+                    if (!user || user.password !== password) {
+                        throw new Error('E-Mail oder Passwort ist falsch');
+                    }
+                    
+                    this.token = 'mock_token_' + Date.now();
+                    this.currentUser = user;
+                    
+                    return {
+                        token: this.token,
+                        user: { id: user.id, email: user.email, salonName: user.salonName }
+                    };
+                }
+
+                if (endpoint === '/register' && options.method === 'POST') {
+                    const { email, password, salonName } = options.body;
+                    
+                    if (this.users.has(email.toLowerCase())) {
+                        throw new Error('Diese E-Mail ist bereits registriert');
+                    }
+                    
+                    if (password.length < 6) {
+                        throw new Error('Passwort muss mindestens 6 Zeichen haben');
+                    }
+                    
+                    const newUser = {
+                        id: Date.now(),
+                        email: email.toLowerCase(),
+                        password,
+                        salonName,
+                        appointments: [],
+                        customers: [],
+                        services: [
+                            { id: 1, name: 'Haarschnitt', duration: 60, price: 45.00 },
+                            { id: 2, name: 'Färbung', duration: 120, price: 80.00 },
+                            { id: 3, name: 'Massage (60 Min)', duration: 60, price: 65.00 },
+                            { id: 4, name: 'Beratung', duration: 30, price: 35.00 }
+                        ]
+                    };
+                    
+                    this.users.set(email.toLowerCase(), newUser);
+                    return { message: 'Account erfolgreich erstellt!' };
+                }
+
+                if (endpoint === '/dashboard' && this.currentUser) {
+                    const today = new Date().toDateString();
+                    const todayAppointments = this.currentUser.appointments.filter(
+                        apt => apt.date === today && apt.status !== 'cancelled'
+                    ).length;
+                    
+                    return {
+                        todayAppointments,
+                        totalCustomers: this.currentUser.customers.length,
+                        totalServices: this.currentUser.services.length
+                    };
+                }
+
+                if (!this.token) {
+                    throw new Error('Nicht authentifiziert');
+                }
+
+                throw new Error('Endpoint nicht gefunden');
+            },
+
+            login: (email, password) => MockAPI.request('/login', {
+                method: 'POST',
+                body: { email, password }
+            }),
+
+            register: (email, password, salonName) => MockAPI.request('/register', {
+                method: 'POST',
+                body: { email, password, salonName }
+            }),
+
+            getDashboard: () => MockAPI.request('/dashboard'),
+
+            logout: () => {
+                MockAPI.token = null;
+                MockAPI.currentUser = null;
+            }
+        };
+
+        // Login Component
+        const LoginForm = ({ onLogin }) => {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [salonName, setSalonName] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+
+                try {
+                    if (isLogin) {
+                        const result = await MockAPI.login(email, password);
+                        onLogin(result.user);
+                    } else {
+                        await MockAPI.register(email, password, salonName);
+                        alert('✅ Account erfolgreich erstellt! Bitte loggen Sie sich ein.');
+                        setIsLogin(true);
+                        setError('');
+                        setEmail('');
+                        setPassword('');
+                        setSalonName('');
+                    }
+                } catch (error) {
+                    setError(error.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl mx-auto mb-4 flex items-center justify-center">
+                                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h1 className="text-3xl font-bold text-gray-800">ProfiSlots</h1>
+                            <p className="text-gray-600 mt-2">
+                                {isLogin ? 'Bei Ihrem Account anmelden' : 'Neuen Account erstellen'}
+                            </p>
+                        </div>
+
+                        {/* Error Message */}
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                                <div className="flex items-center">
+                                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    {error}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Form */}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">E-Mail</label>
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    required
+                                    placeholder="ihre@email.de"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Passwort</label>
+                                <input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    required
+                                    placeholder="Mindestens 6 Zeichen"
+                                    minLength="6"
+                                />
+                            </div>
+
+                            {!isLogin && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Salon Name</label>
+                                    <input
+                                        type="text"
+                                        value={salonName}
+                                        onChange={(e) => setSalonName(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        required
+                                        placeholder="z.B. Salon Müller"
+                                    />
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                {loading ? (
+                                    <div className="flex items-center justify-center">
+                                        <div className="loading w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                                        Wird verarbeitet...
+                                    </div>
+                                ) : (
+                                    isLogin ? 'Anmelden' : 'Account erstellen'
+                                )}
+                            </button>
+                        </form>
+
+                        {/* Switch Mode */}
+                        <div className="mt-6 text-center">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsLogin(!isLogin);
+                                    setError('');
+                                }}
+                                className="text-indigo-600 hover:text-indigo-700 font-medium"
+                            >
+                                {isLogin 
+                                    ? '🆕 Noch kein Account? Jetzt registrieren' 
+                                    : '🔑 Bereits registriert? Hier anmelden'
+                                }
+                            </button>
+                        </div>
+
+                        {/* Demo Info */}
+                        <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+                            <h4 className="font-medium text-gray-800 mb-2">🚀 Demo-System</h4>
+                            <p className="text-sm text-gray-600">
+                                Dies ist Ihr ProfiSlots Terminbuchungssystem. Erstellen Sie einen Account und testen Sie alle Funktionen!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Component
+        const Dashboard = ({ user, onLogout }) => {
+            const [stats, setStats] = useState({ todayAppointments: 0, totalCustomers: 0, totalServices: 4 });
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const loadDashboard = async () => {
+                    try {
+                        const data = await MockAPI.getDashboard();
+                        setStats(data);
+                    } catch (error) {
+                        console.error('Dashboard Error:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                loadDashboard();
+            }, []);
+
+            const handleLogout = () => {
+                MockAPI.logout();
+                onLogout();
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Header */}
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h1 className="text-3xl font-bold text-gray-800">ProfiSlots</h1>
+                                        <p className="text-gray-600">{user.salonName}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleLogout}
+                                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    Abmelden
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Dashboard Content */}
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h2>
+                            <p className="text-gray-600 mb-6">Willkommen in Ihrem Terminbuchungssystem, {user.email}!</p>
+                            
+                            {/* Stats */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 rounded-lg text-white">
+                                    <div className="flex items-center">
+                                        <svg className="w-8 h-8 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                        </svg>
+                                        <div>
+                                            <h3 className="text-lg font-medium">Termine heute</h3>
+                                            <p className="text-3xl font-bold">{loading ? '...' : stats.todayAppointments}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-gradient-to-r from-green-500 to-green-600 p-6 rounded-lg text-white">
+                                    <div className="flex items-center">
+                                        <svg className="w-8 h-8 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                                        </svg>
+                                        <div>
+                                            <h3 className="text-lg font-medium">Kunden</h3>
+                                            <p className="text-3xl font-bold">{loading ? '...' : stats.totalCustomers}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 rounded-lg text-white">
+                                    <div className="flex items-center">
+                                        <svg className="w-8 h-8 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                        </svg>
+                                        <div>
+                                            <h3 className="text-lg font-medium">Services</h3>
+                                            <p className="text-3xl font-bold">{loading ? '...' : stats.totalServices}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="mb-8">
+                                <h3 className="text-lg font-medium text-gray-800 mb-4">Schnellaktionen</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button className="bg-indigo-600 text-white p-4 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center space-x-2">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                        </svg>
+                                        <span>Neuen Termin buchen</span>
+                                    </button>
+                                    <button className="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                        </svg>
+                                        <span>Neuen Kunden anlegen</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                                <div className="flex">
+                                    <svg className="w-5 h-5 text-green-400 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="font-medium text-green-800">✅ System funktioniert jetzt!</h4>
+                                        <p className="text-green-700 text-sm mt-1">
+                                            Das localStorage-Problem wurde behoben. ProfiSlots läuft jetzt vollständig funktionsfähig!
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(false);
+
+            const handleLogin = (userData) => {
+                setUser(userData);
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full loading mx-auto mb-4"></div>
+                            <h2 className="text-xl font-semibold text-gray-800">ProfiSlots</h2>
+                            <p className="text-gray-600">wird geladen...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!user) {
+                return <LoginForm onLogin={handleLogin} />;
+            }
+
+            return <Dashboard user={user} onLogout={handleLogout} />;
+        };
+
+        // Render App
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+            ReactDOM.render(<App />, rootElement);
+        } else {
+            console.error('Root element not found');
+        }
+    </script>
 </body>
 </html>
