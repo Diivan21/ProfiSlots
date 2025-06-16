@@ -41,6 +41,9 @@ const API = (() => {
 
     try {
       console.log(`🌐 API Request: ${config.method || 'GET'} ${url}`);
+      if (config.body) {
+        console.log('Request body:', JSON.parse(config.body));
+      }
       
       const response = await fetch(url, config);
       
@@ -52,6 +55,8 @@ const API = (() => {
         } catch (e) {
           errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
         }
+        
+        console.error('API Error Response:', errorData);
         
         // Spezielle Behandlung für 401 (Unauthorized)
         if (response.status === 401) {
@@ -74,7 +79,9 @@ const API = (() => {
       return data;
     } catch (error) {
       console.error(`❌ API Error: ${config.method || 'GET'} ${url}`, error);
-      ProfiSlots.ErrorHandler.log(error, `API Request: ${url}`);
+      if (window.ProfiSlots && ProfiSlots.ErrorHandler) {
+        ProfiSlots.ErrorHandler.log(error, `API Request: ${url}`);
+      }
       throw error;
     }
   };
@@ -299,9 +306,7 @@ const API = (() => {
       const data = {
         name: customerData.name.trim(),
         phone: customerData.phone.trim(),
-        email: customerData.email?.trim() || '',
-        total_visits: 0,
-        last_visit: null
+        email: customerData.email?.trim() || ''
       };
 
       if (data.email && !ProfiSlots.Validation.isValidEmail(data.email)) {
@@ -382,21 +387,28 @@ const API = (() => {
       return await request(`/appointments/date/${date}`);
     },
 
-    // Termin erstellen
+    // Termin erstellen - API erwartet spezifische Feldnamen
     async create(appointmentData) {
-      if (!ProfiSlots.Validation.isValidAppointment(appointmentData)) {
-        throw new Error('Ungültige Termin-Daten');
+      // Validation
+      if (!appointmentData.customer_id || !appointmentData.staff_id || !appointmentData.service_id) {
+        throw new Error('Kunde, Mitarbeiter und Service sind erforderlich');
       }
+      
+      if (!appointmentData.appointment_date || !appointmentData.appointment_time) {
+        throw new Error('Datum und Zeit sind erforderlich');
+      }
+
+      console.log('Creating appointment with data:', appointmentData);
 
       return await request('/appointments', {
         method: 'POST',
         body: {
-          customer_id: appointmentData.customerId,
-          staff_id: appointmentData.staffId,
-          service_id: appointmentData.serviceId,
-          appointment_date: appointmentData.date,
-          appointment_time: appointmentData.time,
-          status: 'confirmed'
+          customer_id: appointmentData.customer_id,
+          staff_id: appointmentData.staff_id,
+          service_id: appointmentData.service_id,
+          appointment_date: appointmentData.appointment_date,
+          appointment_time: appointmentData.appointment_time,
+          notes: appointmentData.notes || ''
         }
       });
     },
@@ -433,15 +445,6 @@ const API = (() => {
       return await request(`/appointments/${appointmentId}/confirm`, {
         method: 'PUT'
       });
-    },
-
-    // Verfügbare Zeitslots prüfen
-    async getAvailableSlots(staffId, date) {
-      if (!staffId || !date) {
-        throw new Error('Mitarbeiter-ID und Datum sind erforderlich');
-      }
-
-      return await request(`/appointments/available-slots?staff_id=${staffId}&date=${date}`);
     }
   };
 
@@ -487,12 +490,10 @@ window.ProfiSlots.API = API;
 // Event Listener für automatisches Logout bei Token-Ablauf
 window.addEventListener('auth:logout', () => {
   console.log('🚪 Auth logout event triggered');
-  // Hier könnte eine Redirect zur Login-Seite erfolgen
 });
 
 window.addEventListener('auth:login', (event) => {
   console.log('✅ Auth login event triggered', event.detail);
-  // Hier könnte eine Redirect zum Dashboard erfolgen
 });
 
 console.log('✅ ProfiSlots API Client loaded');
