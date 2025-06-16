@@ -10,7 +10,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     
-    <!-- External Libraries -->
+    <!-- External Libraries - DEVELOPMENT BUILDS for better error messages -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -20,7 +20,7 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="/public/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css">
     
     <!-- Tailwind Config -->
     <script>
@@ -86,37 +86,41 @@
     <!-- Global Variables for Browser -->
     <script>
         // Define process.env for browser compatibility
-        window.process = window.process || { env: { NODE_ENV: 'production' } };
+        window.process = window.process || { env: { NODE_ENV: 'development' } };
         
         // Define global notification functions
-        window.showError = window.showError || function(message) {
+        window.showError = function(message) {
             console.error('Error:', message);
-            alert('Fehler: ' + message);
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-container').classList.remove('hidden');
+            setTimeout(hideError, 5000);
         };
         
-        window.showSuccess = window.showSuccess || function(message) {
+        window.showSuccess = function(message) {
             console.log('Success:', message);
-            // alert('Erfolg: ' + message);
+            document.getElementById('success-message').textContent = message;
+            document.getElementById('success-container').classList.remove('hidden');
+            setTimeout(hideSuccess, 3000);
         };
         
-        window.hideError = window.hideError || function() {
-            console.log('Hide error called');
+        window.hideError = function() {
+            document.getElementById('error-container').classList.add('hidden');
         };
         
-        window.hideSuccess = window.hideSuccess || function() {
-            console.log('Hide success called');
+        window.hideSuccess = function() {
+            document.getElementById('success-container').classList.add('hidden');
         };
     </script>
 
     <!-- Module Scripts (Load Order Important!) -->
-    <script src="/public/js/utils.js"></script>
-    <script src="/public/js/api.js"></script>
-    <script type="text/babel" src="/public/js/components/header.js"></script>
-    <script type="text/babel" src="/public/js/components/modals.js"></script>
-    <script type="text/babel" src="/public/js/auth.js"></script>
-    <script type="text/babel" src="/public/js/dashboard.js"></script>
-    <script type="text/babel" src="/public/js/booking.js"></script>
-    <script type="text/babel" src="/public/js/app.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/api.js"></script>
+    <script type="text/babel" src="/js/components/header.js"></script>
+    <script type="text/babel" src="/js/components/modals.js"></script>
+    <script type="text/babel" src="/js/auth.js"></script>
+    <script type="text/babel" src="/js/dashboard.js"></script>
+    <script type="text/babel" src="/js/booking.js"></script>
+    <script type="text/babel" src="/js/app.js"></script>
 
     <!-- Global Error Handler -->
     <script>
@@ -130,35 +134,7 @@
             showError('Verbindungsfehler - Bitte versuchen Sie es erneut');
         });
 
-        function showError(message) {
-            document.getElementById('error-message').textContent = message;
-            document.getElementById('error-container').classList.remove('hidden');
-            setTimeout(hideError, 5000);
-        }
-
-        function hideError() {
-            document.getElementById('error-container').classList.add('hidden');
-        }
-
-        function showSuccess(message) {
-            document.getElementById('success-message').textContent = message;
-            document.getElementById('success-container').classList.remove('hidden');
-            setTimeout(hideSuccess, 3000);
-        }
-
-        function hideSuccess() {
-            document.getElementById('success-container').classList.add('hidden');
-        }
-
-        // Make functions globally available
-        window.showError = showError;
-        window.hideError = hideError;
-        window.showSuccess = showSuccess;
-        window.hideSuccess = hideSuccess;
-    </script>
-
-    <!-- Performance Monitoring -->
-    <script>
+        // Performance Monitoring
         window.addEventListener('load', function() {
             const loadTime = performance.now();
             console.log(`ProfiSlots loaded in ${Math.round(loadTime)}ms`);
