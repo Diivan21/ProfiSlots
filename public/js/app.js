@@ -487,6 +487,35 @@ class ErrorBoundary extends React.Component {
 
 // ==================== APP INITIALIZATION ====================
 const initializeProfiSlots = () => {
+  console.log('🔄 Starting ProfiSlots initialization...');
+  
+  // Check if React is available
+  if (!window.React || !window.ReactDOM) {
+    console.error('❌ React or ReactDOM not loaded');
+    showError('React wurde nicht geladen. Bitte laden Sie die Seite neu.');
+    return;
+  }
+  
+  console.log('✅ React loaded');
+  
+  // Check if lucide is available
+  if (!window.lucide) {
+    console.error('❌ Lucide icons not loaded');
+    showError('Icons wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    return;
+  }
+  
+  console.log('✅ Lucide icons loaded');
+  
+  // Check if ProfiSlots namespace exists
+  if (!window.ProfiSlots) {
+    console.error('❌ ProfiSlots namespace not found');
+    showError('ProfiSlots Module wurden nicht geladen. Bitte laden Sie die Seite neu.');
+    return;
+  }
+  
+  console.log('✅ ProfiSlots namespace exists');
+  
   // Check if all required components are loaded
   const requiredComponents = [
     'ProfiSlots.Header',
@@ -497,6 +526,8 @@ const initializeProfiSlots = () => {
     'ProfiSlots.API'
   ];
 
+  console.log('🔍 Checking required components...');
+  
   const missingComponents = requiredComponents.filter(component => {
     // Sicherer Check für verfügbare Komponenten
     const parts = component.split('.');
@@ -506,16 +537,23 @@ const initializeProfiSlots = () => {
       if (obj && typeof obj === 'object' && part in obj) {
         obj = obj[part];
       } else {
+        console.log(`❌ Missing component: ${component} (failed at ${part})`);
         return true; // Component missing
       }
     }
     
-    return typeof obj === 'undefined';
+    const exists = typeof obj !== 'undefined';
+    console.log(`${exists ? '✅' : '❌'} Component ${component}: ${exists ? 'found' : 'missing'}`);
+    return !exists;
   });
 
   if (missingComponents.length > 0) {
     console.error('❌ Missing required components:', missingComponents);
-    showError('Fehler beim Laden der Anwendung. Bitte laden Sie die Seite neu.');
+    
+    // More detailed debugging
+    console.log('Available ProfiSlots components:', Object.keys(window.ProfiSlots || {}));
+    
+    showError('Fehler beim Laden der Anwendung. Fehlende Komponenten: ' + missingComponents.join(', '));
     return;
   }
 
@@ -525,21 +563,31 @@ const initializeProfiSlots = () => {
   const appContainer = document.getElementById('app');
   if (!appContainer) {
     console.error('❌ App container not found');
+    showError('App Container nicht gefunden');
     return;
   }
 
-  // Clear loading screen
-  appContainer.innerHTML = '';
+  console.log('✅ App container found');
 
-  // Render app with error boundary
-  ReactDOM.render(
-    React.createElement(ErrorBoundary, {}, [
-      React.createElement(App, { key: 'app' })
-    ]), 
-    appContainer
-  );
+  try {
+    // Clear loading screen
+    appContainer.innerHTML = '';
 
-  console.log('✅ ProfiSlots App started successfully');
+    console.log('🎨 Rendering React app...');
+
+    // Render app with error boundary
+    ReactDOM.render(
+      React.createElement(ErrorBoundary, {}, [
+        React.createElement(App, { key: 'app' })
+      ]), 
+      appContainer
+    );
+
+    console.log('✅ ProfiSlots App started successfully');
+  } catch (error) {
+    console.error('❌ Error rendering app:', error);
+    showError('Fehler beim Rendern der App: ' + error.message);
+  }
 };
 
 // ==================== STARTUP ====================
