@@ -307,4 +307,107 @@ export const ServiceManager = ({ services, onUpdate }) => {
                 )
             ),
 
-            // Service Form (conditionally
+            // Service Form (conditionally rendered)
+            showForm && React.createElement(ServiceForm, {
+                service: editingService,
+                onSave: handleFormSave,
+                onCancel: handleFormCancel
+            }),
+
+            // Services Grid
+            services.length === 0 ? 
+                React.createElement('div', { 
+                    className: "text-center py-12" 
+                },
+                    React.createElement(Icons.Settings, { 
+                        className: "w-16 h-16 text-gray-300 mx-auto mb-4" 
+                    }),
+                    React.createElement('h3', { 
+                        className: "text-lg font-medium text-gray-900 mb-2" 
+                    }, 'Noch keine Services'),
+                    React.createElement('p', { 
+                        className: "text-gray-500 mb-4" 
+                    }, 'Erstellen Sie Ihren ersten Service, um mit Terminbuchungen zu beginnen.'),
+                    React.createElement('button', {
+                        onClick: handleAddNew,
+                        className: "bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                    }, 'Ersten Service erstellen')
+                ) :
+                React.createElement('div', { 
+                    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+                },
+                    services.map(service =>
+                        React.createElement(ServiceCard, {
+                            key: service.id,
+                            service,
+                            onEdit: () => handleEdit(service),
+                            onDelete: () => handleDelete(service.id)
+                        })
+                    )
+                ),
+
+            // Statistics
+            services.length > 0 && React.createElement('div', { 
+                className: "mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 border-t border-gray-200" 
+            },
+                React.createElement('div', { 
+                    className: "bg-blue-50 p-4 rounded-lg" 
+                },
+                    React.createElement('div', { 
+                        className: "flex items-center" 
+                    },
+                        React.createElement(Icons.Settings, { 
+                            className: "w-8 h-8 text-blue-600 mr-3" 
+                        }),
+                        React.createElement('div', null,
+                            React.createElement('div', { 
+                                className: "text-2xl font-bold text-blue-600" 
+                            }, services.length),
+                            React.createElement('div', { 
+                                className: "text-sm text-blue-700" 
+                            }, 'Services gesamt')
+                        )
+                    )
+                ),
+                React.createElement('div', { 
+                    className: "bg-green-50 p-4 rounded-lg" 
+                },
+                    React.createElement('div', { 
+                        className: "flex items-center" 
+                    },
+                        React.createElement(Icons.Clock, { 
+                            className: "w-8 h-8 text-green-600 mr-3" 
+                        }),
+                        React.createElement('div', null,
+                            React.createElement('div', { 
+                                className: "text-2xl font-bold text-green-600" 
+                            }, Math.round(services.reduce((sum, s) => sum + s.duration, 0) / services.length)),
+                            React.createElement('div', { 
+                                className: "text-sm text-green-700" 
+                            }, 'Ø Dauer (Min)')
+                        )
+                    )
+                ),
+                React.createElement('div', { 
+                    className: "bg-purple-50 p-4 rounded-lg" 
+                },
+                    React.createElement('div', { 
+                        className: "flex items-center" 
+                    },
+                        React.createElement(Icons.Euro, { 
+                            className: "w-8 h-8 text-purple-600 mr-3" 
+                        }),
+                        React.createElement('div', null,
+                            React.createElement('div', { 
+                                className: "text-2xl font-bold text-purple-600" 
+                            }, Math.round(services.reduce((sum, s) => sum + parseFloat(s.price), 0) / services.length)),
+                            React.createElement('div', { 
+                                className: "text-sm text-purple-700" 
+                            }, 'Ø Preis (€)')
+                        )
+                    )
+                )
+            )
+        )
+    );
+};
