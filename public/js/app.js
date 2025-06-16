@@ -115,16 +115,84 @@ const App = () => {
         return React.createElement(ProfiSlots.BookingPage, commonProps);
       
       case 'appointments':
-        return React.createElement(ProfiSlots.AppointmentsPage, commonProps);
+        // Temporärer Platzhalter - wird durch echte Komponente ersetzt
+        return React.createElement('div', {
+          className: "container-main py-8 text-center"
+        }, [
+          React.createElement('h1', {
+            key: 'title',
+            className: "text-2xl font-bold text-gray-800 mb-4"
+          }, '📅 Terminverwaltung'),
+          React.createElement('p', {
+            key: 'message',
+            className: "text-gray-600 mb-6"
+          }, 'Diese Seite wird gerade entwickelt.'),
+          React.createElement('button', {
+            key: 'back-button',
+            onClick: () => handleViewChange('dashboard'),
+            className: "btn-primary"
+          }, 'Zurück zum Dashboard')
+        ]);
       
       case 'customers':
-        return React.createElement(ProfiSlots.CustomersPage, commonProps);
+        // Temporärer Platzhalter
+        return React.createElement('div', {
+          className: "container-main py-8 text-center"
+        }, [
+          React.createElement('h1', {
+            key: 'title',
+            className: "text-2xl font-bold text-gray-800 mb-4"
+          }, '👥 Kundenverwaltung'),
+          React.createElement('p', {
+            key: 'message',
+            className: "text-gray-600 mb-6"
+          }, 'Diese Seite wird gerade entwickelt.'),
+          React.createElement('button', {
+            key: 'back-button',
+            onClick: () => handleViewChange('dashboard'),
+            className: "btn-primary"
+          }, 'Zurück zum Dashboard')
+        ]);
       
       case 'services':
-        return React.createElement(ProfiSlots.ServicesPage, commonProps);
+        // Temporärer Platzhalter
+        return React.createElement('div', {
+          className: "container-main py-8 text-center"
+        }, [
+          React.createElement('h1', {
+            key: 'title',
+            className: "text-2xl font-bold text-gray-800 mb-4"
+          }, '⚙️ Service-Verwaltung'),
+          React.createElement('p', {
+            key: 'message',
+            className: "text-gray-600 mb-6"
+          }, 'Diese Seite wird gerade entwickelt.'),
+          React.createElement('button', {
+            key: 'back-button',
+            onClick: () => handleViewChange('dashboard'),
+            className: "btn-primary"
+          }, 'Zurück zum Dashboard')
+        ]);
       
       case 'staff':
-        return React.createElement(ProfiSlots.StaffPage, commonProps);
+        // Temporärer Platzhalter
+        return React.createElement('div', {
+          className: "container-main py-8 text-center"
+        }, [
+          React.createElement('h1', {
+            key: 'title',
+            className: "text-2xl font-bold text-gray-800 mb-4"
+          }, '👨‍💼 Mitarbeiter-Verwaltung'),
+          React.createElement('p', {
+            key: 'message',
+            className: "text-gray-600 mb-6"
+          }, 'Diese Seite wird gerade entwickelt.'),
+          React.createElement('button', {
+            key: 'back-button',
+            onClick: () => handleViewChange('dashboard'),
+            className: "btn-primary"
+          }, 'Zurück zum Dashboard')
+        ]);
       
       default:
         console.error('Unknown view:', currentView);
@@ -373,7 +441,7 @@ class ErrorBoundary extends React.Component {
           }, 'Es ist ein unerwarteter Fehler in der Anwendung aufgetreten. Bitte laden Sie die Seite neu oder kontaktieren Sie den Support.'),
           
           // Error Details (nur in Development)
-          process.env.NODE_ENV === 'development' && React.createElement('details', {
+          typeof window !== 'undefined' && window.location.hostname === 'localhost' && React.createElement('details', {
             key: 'error-details',
             className: "mb-6 p-4 bg-gray-50 rounded-lg"
           }, [
