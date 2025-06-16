@@ -14,6 +14,8 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Lucide Icons -->
@@ -91,24 +93,38 @@
         // Define global notification functions
         window.showError = function(message) {
             console.error('Error:', message);
-            document.getElementById('error-message').textContent = message;
-            document.getElementById('error-container').classList.remove('hidden');
-            setTimeout(hideError, 5000);
+            const errorElement = document.getElementById('error-message');
+            const errorContainer = document.getElementById('error-container');
+            if (errorElement && errorContainer) {
+                errorElement.textContent = message;
+                errorContainer.classList.remove('hidden');
+                setTimeout(hideError, 5000);
+            }
         };
         
         window.showSuccess = function(message) {
             console.log('Success:', message);
-            document.getElementById('success-message').textContent = message;
-            document.getElementById('success-container').classList.remove('hidden');
-            setTimeout(hideSuccess, 3000);
+            const successElement = document.getElementById('success-message');
+            const successContainer = document.getElementById('success-container');
+            if (successElement && successContainer) {
+                successElement.textContent = message;
+                successContainer.classList.remove('hidden');
+                setTimeout(hideSuccess, 3000);
+            }
         };
         
         window.hideError = function() {
-            document.getElementById('error-container').classList.add('hidden');
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer) {
+                errorContainer.classList.add('hidden');
+            }
         };
         
         window.hideSuccess = function() {
-            document.getElementById('success-container').classList.add('hidden');
+            const successContainer = document.getElementById('success-container');
+            if (successContainer) {
+                successContainer.classList.add('hidden');
+            }
         };
     </script>
 
@@ -126,12 +142,20 @@
     <script>
         window.addEventListener('error', function(e) {
             console.error('Global Error:', e.error);
-            showError('Ein unerwarteter Fehler ist aufgetreten');
+            if (e.error && e.error.message) {
+                console.error('Error message:', e.error.message);
+                console.error('Error stack:', e.error.stack);
+            }
+            if (window.showError) {
+                showError('Ein unerwarteter Fehler ist aufgetreten: ' + (e.error?.message || 'Unbekannter Fehler'));
+            }
         });
 
         window.addEventListener('unhandledrejection', function(e) {
             console.error('Unhandled Promise Rejection:', e.reason);
-            showError('Verbindungsfehler - Bitte versuchen Sie es erneut');
+            if (window.showError) {
+                showError('Verbindungsfehler - Bitte versuchen Sie es erneut');
+            }
         });
 
         // Performance Monitoring
@@ -139,16 +163,16 @@
             const loadTime = performance.now();
             console.log(`ProfiSlots loaded in ${Math.round(loadTime)}ms`);
             
-            // Hide loading screen
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-                setTimeout(() => {
+            // Hide loading screen after scripts are loaded
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
                     loadingScreen.style.opacity = '0';
                     setTimeout(() => {
                         loadingScreen.style.display = 'none';
                     }, 300);
-                }, 500);
-            }
+                }
+            }, 1000); // Increased delay to ensure all scripts are loaded
         });
     </script>
 </body>
