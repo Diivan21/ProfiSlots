@@ -49,21 +49,32 @@ const BookingPage = ({ user, onViewChange }) => {
   const loadInitialData = async () => {
     try {
       setLoading(true);
+      console.log('Loading initial data...');
+      
       const [servicesData, staffData, customersData] = await Promise.all([
         ProfiSlots.API.services.getAll(),
         ProfiSlots.API.staff.getAll(),
         ProfiSlots.API.customers.getAll()
       ]);
       
-      setServices(servicesData);
-      setStaff(staffData);
-      setCustomers(customersData);
+      console.log('Loaded data:', { 
+        services: servicesData.length, 
+        staff: staffData.length, 
+        customers: customersData.length 
+      });
+      
+      setServices(servicesData || []);
+      setStaff(staffData || []);
+      setCustomers(customersData || []);
       
       // Set today as default date
       setSelectedDate(ProfiSlots.DateUtils.today());
       
     } catch (error) {
-      showError('Fehler beim Laden der Daten: ' + error.message);
+      console.error('Error loading initial data:', error);
+      if (window.showError) {
+        showError('Fehler beim Laden der Daten: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -71,6 +82,8 @@ const BookingPage = ({ user, onViewChange }) => {
 
   const loadAvailableSlots = async () => {
     try {
+      console.log('Loading available slots for:', { staffId: selectedStaff.id, date: selectedDate });
+      
       // Generate all possible time slots
       const allSlots = ProfiSlots.DateUtils.generateTimeSlots(8, 18, 30);
       
@@ -79,6 +92,8 @@ const BookingPage = ({ user, onViewChange }) => {
       const staffAppointments = appointments.filter(apt => 
         apt.staff_id === selectedStaff.id && apt.status !== 'cancelled'
       );
+      
+      console.log('Existing appointments:', staffAppointments);
       
       // Filter out booked slots
       const available = allSlots.filter(slot => {
@@ -99,6 +114,7 @@ const BookingPage = ({ user, onViewChange }) => {
         return slotTime > now;
       });
       
+      console.log('Available slots:', filteredSlots);
       setAvailableSlots(filteredSlots);
       
       // Clear selected time if it's no longer available
@@ -143,7 +159,9 @@ const BookingPage = ({ user, onViewChange }) => {
         throw new Error('Gültige E-Mail-Adresse eingeben');
       }
 
+      console.log('Creating customer:', newCustomer);
       const createdCustomer = await ProfiSlots.API.customers.create(newCustomer);
+      console.log('Customer created:', createdCustomer);
       
       // Add to customers list and select
       setCustomers(prev => [...prev, createdCustomer]);
@@ -155,9 +173,14 @@ const BookingPage = ({ user, onViewChange }) => {
       setShowCustomerModal(false);
       setCustomerSearchTerm('');
       
-      showSuccess('Kunde erfolgreich erstellt!');
+      if (window.showSuccess) {
+        showSuccess('Kunde erfolgreich erstellt!');
+      }
     } catch (error) {
-      showError(error.message);
+      console.error('Error creating customer:', error);
+      if (window.showError) {
+        showError(error.message);
+      }
     }
   };
 
@@ -182,18 +205,29 @@ const BookingPage = ({ user, onViewChange }) => {
       }
 
       setSubmitting(true);
-
-      const appointmentData = {
+      console.log('Booking appointment with data:', {
         customerId: selectedCustomer.id,
         staffId: selectedStaff.id,
         serviceId: selectedService.id,
         date: selectedDate,
         time: selectedTime
+      });
+
+      const appointmentData = {
+        customer_id: selectedCustomer.id,
+        staff_id: selectedStaff.id,
+        service_id: selectedService.id,
+        appointment_date: selectedDate,
+        appointment_time: selectedTime,
+        notes: ''
       };
 
-      await ProfiSlots.API.appointments.create(appointmentData);
+      const result = await ProfiSlots.API.appointments.create(appointmentData);
+      console.log('Appointment created:', result);
       
-      showSuccess('Termin erfolgreich gebucht!');
+      if (window.showSuccess) {
+        showSuccess('Termin erfolgreich gebucht!');
+      }
       
       // Reset form
       resetForm();
@@ -204,7 +238,10 @@ const BookingPage = ({ user, onViewChange }) => {
       }, 1500);
       
     } catch (error) {
-      showError(error.message);
+      console.error('Error booking appointment:', error);
+      if (window.showError) {
+        showError(error.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -320,50 +357,61 @@ const BookingPage = ({ user, onViewChange }) => {
               className: "text-red-500 ml-1"
             }, '*')
           ]),
-          React.createElement('div', {
-            key: 'service-grid',
-            className: "grid grid-cols-1 md:grid-cols-2 gap-4"
-          }, services.map(service => {
-            const IconComponent = getServiceIcon(service.icon);
-            return React.createElement('button', {
-              key: service.id,
-              onClick: () => setSelectedService(service),
-              className: `service-card ${
-                selectedService?.id === service.id ? 'service-card-selected' : 'service-card-available'
-              }`
+          
+          services.length === 0 ? 
+            React.createElement('div', {
+              key: 'no-services',
+              className: "text-center py-8"
             }, [
-              React.createElement('div', {
-                key: 'service-header',
-                className: "flex items-center justify-between mb-3"
+              React.createElement('p', {
+                key: 'no-services-text',
+                className: "text-gray-500"
+              }, 'Keine Services verfügbar. Bitte erstellen Sie zuerst einen Service.')
+            ]) :
+            React.createElement('div', {
+              key: 'service-grid',
+              className: "grid grid-cols-1 md:grid-cols-2 gap-4"
+            }, services.map(service => {
+              const IconComponent = getServiceIcon(service.icon);
+              return React.createElement('button', {
+                key: service.id,
+                onClick: () => setSelectedService(service),
+                className: `service-card ${
+                  selectedService?.id === service.id ? 'service-card-selected' : 'service-card-available'
+                }`
               }, [
                 React.createElement('div', {
-                  key: 'service-info',
-                  className: "flex items-center space-x-3"
+                  key: 'service-header',
+                  className: "flex items-center justify-between mb-3"
                 }, [
-                  React.createElement(IconComponent, {
-                    key: 'service-icon-comp',
-                    className: "w-6 h-6 text-blue-600"
-                  }),
                   React.createElement('div', {
-                    key: 'service-details'
+                    key: 'service-info',
+                    className: "flex items-center space-x-3"
                   }, [
+                    React.createElement(IconComponent, {
+                      key: 'service-icon-comp',
+                      className: "w-6 h-6 text-blue-600"
+                    }),
                     React.createElement('div', {
-                      key: 'service-name',
-                      className: "font-medium text-gray-800"
-                    }, service.name),
-                    React.createElement('div', {
-                      key: 'service-duration',
-                      className: "text-sm text-gray-500"
-                    }, `${service.duration} Min`)
-                  ])
-                ]),
-                React.createElement('div', {
-                  key: 'service-price',
-                  className: "text-lg font-semibold text-blue-600"
-                }, ProfiSlots.CurrencyUtils.format(service.price))
-              ])
-            ]);
-          }))
+                      key: 'service-details'
+                    }, [
+                      React.createElement('div', {
+                        key: 'service-name',
+                        className: "font-medium text-gray-800"
+                      }, service.name),
+                      React.createElement('div', {
+                        key: 'service-duration',
+                        className: "text-sm text-gray-500"
+                      }, `${service.duration} Min`)
+                    ])
+                  ]),
+                  React.createElement('div', {
+                    key: 'service-price',
+                    className: "text-lg font-semibold text-blue-600"
+                  }, ProfiSlots.CurrencyUtils.format(service.price))
+                ])
+              ]);
+            }))
         ]),
 
         // Staff Selection
@@ -385,46 +433,57 @@ const BookingPage = ({ user, onViewChange }) => {
               className: "text-red-500 ml-1"
             }, '*')
           ]),
-          React.createElement('div', {
-            key: 'staff-grid',
-            className: "grid grid-cols-1 md:grid-cols-2 gap-4"
-          }, staff.map(staffMember => 
-            React.createElement('button', {
-              key: staffMember.id,
-              onClick: () => setSelectedStaff(staffMember),
-              className: `staff-card ${
-                selectedStaff?.id === staffMember.id ? 'staff-card-selected' : 'staff-card-available'
-              }`
+          
+          staff.length === 0 ? 
+            React.createElement('div', {
+              key: 'no-staff',
+              className: "text-center py-8"
             }, [
-              React.createElement('div', {
-                key: 'staff-content',
-                className: "flex items-center space-x-3"
+              React.createElement('p', {
+                key: 'no-staff-text',
+                className: "text-gray-500"
+              }, 'Keine Mitarbeiter verfügbar.')
+            ]) :
+            React.createElement('div', {
+              key: 'staff-grid',
+              className: "grid grid-cols-1 md:grid-cols-2 gap-4"
+            }, staff.map(staffMember => 
+              React.createElement('button', {
+                key: staffMember.id,
+                onClick: () => setSelectedStaff(staffMember),
+                className: `staff-card ${
+                  selectedStaff?.id === staffMember.id ? 'staff-card-selected' : 'staff-card-available'
+                }`
               }, [
                 React.createElement('div', {
-                  key: 'staff-avatar',
-                  className: "w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center"
-                }, [
-                  React.createElement(lucide.User, {
-                    key: 'staff-avatar-icon',
-                    className: "w-6 h-6 text-blue-600"
-                  })
-                ]),
-                React.createElement('div', {
-                  key: 'staff-info',
-                  className: "text-left"
+                  key: 'staff-content',
+                  className: "flex items-center space-x-3"
                 }, [
                   React.createElement('div', {
-                    key: 'staff-name',
-                    className: "font-medium text-gray-800"
-                  }, staffMember.name),
+                    key: 'staff-avatar',
+                    className: "w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center"
+                  }, [
+                    React.createElement(lucide.User, {
+                      key: 'staff-avatar-icon',
+                      className: "w-6 h-6 text-blue-600"
+                    })
+                  ]),
                   React.createElement('div', {
-                    key: 'staff-specialty',
-                    className: "text-sm text-gray-500"
-                  }, staffMember.specialty)
+                    key: 'staff-info',
+                    className: "text-left"
+                  }, [
+                    React.createElement('div', {
+                      key: 'staff-name',
+                      className: "font-medium text-gray-800"
+                    }, staffMember.name),
+                    React.createElement('div', {
+                      key: 'staff-specialty',
+                      className: "text-sm text-gray-500"
+                    }, staffMember.specialty || 'Allgemein')
+                  ])
                 ])
               ])
-            ])
-          ))
+            ))
         ]),
 
         // Date & Time Selection
@@ -504,7 +563,7 @@ const BookingPage = ({ user, onViewChange }) => {
         ])
       ]),
 
-      // Right Column - Customer Selection & Summary
+      // Right Column - Customer Selection & Summary  
       React.createElement('div', {
         key: 'right-column',
         className: "space-y-6"
@@ -725,7 +784,7 @@ const BookingPage = ({ user, onViewChange }) => {
     ]),
 
     // Customer Selection Modal
-    React.createElement(ProfiSlots.BaseModal, {
+    showCustomerModal && React.createElement(ProfiSlots.BaseModal, {
       key: 'customer-modal',
       isOpen: showCustomerModal,
       onClose: () => setShowCustomerModal(false),
