@@ -498,7 +498,19 @@ const initializeProfiSlots = () => {
   ];
 
   const missingComponents = requiredComponents.filter(component => {
-    return !eval(`typeof ${component}`) || eval(`typeof ${component}`) === 'undefined';
+    // Sicherer Check für verfügbare Komponenten
+    const parts = component.split('.');
+    let obj = window;
+    
+    for (const part of parts) {
+      if (obj && typeof obj === 'object' && part in obj) {
+        obj = obj[part];
+      } else {
+        return true; // Component missing
+      }
+    }
+    
+    return typeof obj === 'undefined';
   });
 
   if (missingComponents.length > 0) {
