@@ -108,7 +108,9 @@ const App = () => {
       isAuthenticated: true
     });
     setCurrentView('dashboard');
-    showSuccess(`Willkommen zurück, ${userData.salonName}!`);
+    if (window.showSuccess) {
+      showSuccess(`Willkommen zurück, ${userData.salonName}!`);
+    }
   };
 
   const handleLogout = () => {
@@ -120,13 +122,16 @@ const App = () => {
     });
     setCurrentView('dashboard');
     ProfiSlots.Storage.remove('lastView');
-    showSuccess('Erfolgreich abgemeldet');
+    if (window.showSuccess) {
+      showSuccess('Erfolgreich abgemeldet');
+    }
   };
 
   // Render Current View Component
   const renderCurrentView = () => {
     if (!authState.isAuthenticated) {
       return React.createElement(ProfiSlots.AuthPage, {
+        key: 'auth-page',
         onLogin: handleLogin
       });
     }
@@ -138,10 +143,16 @@ const App = () => {
 
     switch (currentView) {
       case 'dashboard':
-        return React.createElement(ProfiSlots.Dashboard, commonProps);
+        return React.createElement(ProfiSlots.Dashboard, {
+          key: 'dashboard',
+          ...commonProps
+        });
       
       case 'booking':
-        return React.createElement(ProfiSlots.BookingPage, commonProps);
+        return React.createElement(ProfiSlots.BookingPage, {
+          key: 'booking',
+          ...commonProps
+        });
       
       case 'appointments':
       case 'customers':
@@ -149,6 +160,7 @@ const App = () => {
       case 'staff':
         // Temporäre Platzhalter
         return React.createElement('div', {
+          key: `placeholder-${currentView}`,
           className: "container-main py-8 text-center"
         }, [
           React.createElement('h1', {
@@ -168,6 +180,7 @@ const App = () => {
       
       default:
         return React.createElement('div', {
+          key: 'error-view',
           className: "container-main py-8 text-center"
         }, [
           React.createElement('h1', {
@@ -190,6 +203,7 @@ const App = () => {
   // Loading Screen
   if (appLoading || authState.loading) {
     return React.createElement('div', {
+      key: 'loading-screen',
       className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center"
     }, [
       React.createElement('div', {
@@ -248,6 +262,7 @@ const App = () => {
   // System Error Screen
   if (systemStatus === 'error') {
     return React.createElement('div', {
+      key: 'error-screen',
       className: "min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4"
     }, [
       React.createElement('div', {
@@ -282,6 +297,7 @@ const App = () => {
 
   // Main App Layout
   return React.createElement('div', {
+    key: 'main-app',
     className: "min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100"
   }, [
     // Header (nur wenn authentifiziert)
@@ -297,9 +313,7 @@ const App = () => {
     React.createElement('main', {
       key: 'main-content',
       className: authState.isAuthenticated ? 'pb-8' : ''
-    }, [
-      renderCurrentView()
-    ]),
+    }, renderCurrentView()),
 
     // Footer (nur wenn authentifiziert)
     authState.isAuthenticated && React.createElement('footer', {
@@ -410,6 +424,21 @@ class ErrorBoundary extends React.Component {
             key: 'error-message',
             className: "text-gray-600 mb-6 text-center"
           }, 'Es ist ein unerwarteter Fehler in der Anwendung aufgetreten.'),
+          
+          // Show error details in development
+          this.state.error && React.createElement('details', {
+            key: 'error-details',
+            className: "mb-4 text-sm"
+          }, [
+            React.createElement('summary', {
+              key: 'error-summary',
+              className: "cursor-pointer text-gray-600 mb-2"
+            }, 'Fehlerdetails anzeigen'),
+            React.createElement('pre', {
+              key: 'error-stack',
+              className: "bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40"
+            }, this.state.error.toString() + '\n\n' + (this.state.errorInfo?.componentStack || ''))
+          ]),
           
           React.createElement('div', {
             key: 'error-actions',
@@ -532,12 +561,23 @@ const initializeProfiSlots = () => {
     appContainer.innerHTML = '';
     console.log('🎨 Rendering React app...');
 
-    ReactDOM.render(
-      React.createElement(ErrorBoundary, {}, [
-        React.createElement(App, { key: 'app' })
-      ]), 
-      appContainer
-    );
+    // Use createRoot for React 18
+    if (ReactDOM.createRoot) {
+      const root = ReactDOM.createRoot(appContainer);
+      root.render(
+        React.createElement(ErrorBoundary, {}, 
+          React.createElement(App, { key: 'main-app' })
+        )
+      );
+    } else {
+      // Fallback for older React versions
+      ReactDOM.render(
+        React.createElement(ErrorBoundary, {}, 
+          React.createElement(App, { key: 'main-app' })
+        ), 
+        appContainer
+      );
+    }
 
     console.log('✅ ProfiSlots App started successfully');
   } catch (error) {
@@ -552,7 +592,8 @@ const initializeProfiSlots = () => {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeProfiSlots);
 } else {
-  initializeProfiSlots();
+  // Add a small delay to ensure all scripts are loaded
+  setTimeout(initializeProfiSlots, 100);
 }
 
 // Global error handlers
