@@ -17,19 +17,25 @@ console.log('NODE_ENV:', process.env.NODE_ENV || 'not set');
 console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 console.log('JWT_SECRET exists:', !!process.env.JWT_SECRET);
 
-// Database Pool mit verbesserter Konfiguration
+// Database Connection mit URL-Dekodierung
 let pool;
 try {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
+  // URL dekodieren für Sonderzeichen im Passwort
+  const databaseUrl = decodeURIComponent(process.env.DATABASE_URL);
+  console.log('Using database URL (masked):', databaseUrl.replace(/:[^:@]+@/, ':***@'));
+
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    connectionString: databaseUrl,
+    ssl: {
+      rejectUnauthorized: false
+    },
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
   });
 
   console.log('✅ Database pool created successfully');
@@ -69,14 +75,14 @@ const authenticateToken = (req) => {
   }
   
   try {
-    const user = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+    const user = jwt.verify(token, process.env.JWT_SECRET || '306651848');
     return user.id;
   } catch (err) {
     throw new Error('Ungültiger Token');
   }
 };
 
-// Einfache Standard-Daten ohne Transaktionen
+// Standard-Daten erstellen
 async function createDefaultData(userId) {
   try {
     debugLog('Creating default data for user:', userId);
@@ -105,7 +111,7 @@ async function createDefaultData(userId) {
     debugLog('Default data created successfully');
   } catch (error) {
     debugLog('Error creating default data:', error.message);
-    console.error('Full error:', error);
+    // Nicht kritisch, App funktioniert auch ohne Standarddaten
   }
 }
 
@@ -135,19 +141,30 @@ module.exports = async (req, res) => {
           throw new Error('Database pool not initialized');
         }
         
-        const dbResult = await pool.query('SELECT NOW() as time, version() as version');
-        debugLog('Database query successful');
+        // Einfacher Test
+        const client = await pool.connect();
+        const dbResult = await client.query('SELECT NOW() as time, current_database() as db');
+        client.release();
+        
+        debugLog('Database connection successful');
         
         return sendResponse(res, 200, {
           status: 'ProfiSlots API Online',
           database: 'Connected',
           dbTime: dbResult.rows[0].time,
-          dbVersion: dbResult.rows[0].version.split(' ')[0], // Just PostgreSQL version
-          environment: process.env.NODE_ENV || 'development'
+          database_name: dbResult.rows[0].db,
+          environment: process.env.NODE_ENV || 'development',
+          node_version: process.version
         });
       } catch (dbError) {
         debugLog('Database error in health check:', dbError.message);
-        return sendError(res, 503, 'Database connection failed', dbError.message);
+        console.error('Full DB Error:', dbError);
+        
+        return sendError(res, 503, 'Database connection failed', {
+          message: dbError.message,
+          code: dbError.code,
+          detail: dbError.detail
+        });
       }
     }
 
@@ -158,8 +175,8 @@ module.exports = async (req, res) => {
         status: 'online',
         version: '1.0.0',
         endpoints: {
-          auth: ['POST /register', 'POST /login'],
           system: ['GET /health'],
+          auth: ['POST /register', 'POST /login'],
           protected: ['GET /dashboard', 'GET /services', 'GET /staff', 'GET /customers', 'GET /appointments']
         }
       });
@@ -202,8 +219,10 @@ module.exports = async (req, res) => {
         const newUser = result.rows[0];
         debugLog('User created successfully:', { id: newUser.id, email: newUser.email });
         
-        // Create default data
-        await createDefaultData(newUser.id);
+        // Create default data (non-critical)
+        createDefaultData(newUser.id).catch(err => 
+          debugLog('Default data creation failed (non-critical):', err.message)
+        );
         
         return sendResponse(res, 201, {
           message: 'Account erfolgreich erstellt! Sie können sich jetzt anmelden.',
@@ -250,7 +269,7 @@ module.exports = async (req, res) => {
         // Generate JWT token
         const token = jwt.sign(
           { id: user.id, email: user.email }, 
-          process.env.JWT_SECRET || 'fallback-secret', 
+          process.env.JWT_SECRET || '306651848', 
           { expiresIn: '7d' }
         );
         
