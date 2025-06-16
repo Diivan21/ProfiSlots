@@ -115,7 +115,7 @@ async function createDefaultData(userId) {
   }
 }
 
-// Main Handler
+// Main Handler - WICHTIG: Hier ist die async function!
 module.exports = async (req, res) => {
   debugLog(`Incoming request: ${req.method} ${req.url}`);
   
