@@ -24,27 +24,12 @@ const AuthPage = ({ onLogin }) => {
     setError('');
   }, [isLogin]);
 
-  // Input Validation in Real-time
-  const validateField = (field, value) => {
-    switch (field) {
-      case 'email':
-        return ProfiSlots.Validation.isValidEmail(value) ? '' : 'Gültige E-Mail-Adresse eingeben';
-      case 'password':
-        return ProfiSlots.Validation.isValidPassword(value) ? '' : 'Passwort muss mindestens 6 Zeichen haben';
-      case 'salonName':
-        return ProfiSlots.Validation.isValidName(value) ? '' : 'Salon-Name ist erforderlich';
-      default:
-        return '';
-    }
-  };
-
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
     
-    // Clear error when user types
     if (error) {
       setError('');
     }
@@ -73,11 +58,15 @@ const AuthPage = ({ onLogin }) => {
         // Login
         const response = await ProfiSlots.API.auth.login(formData.email, formData.password);
         onLogin(response.user);
-        showSuccess('Erfolgreich angemeldet!');
+        if (window.showSuccess) {
+          showSuccess('Erfolgreich angemeldet!');
+        }
       } else {
         // Registration
         await ProfiSlots.API.auth.register(formData.email, formData.password, formData.salonName);
-        showSuccess('Account erfolgreich erstellt! Bitte loggen Sie sich ein.');
+        if (window.showSuccess) {
+          showSuccess('Account erfolgreich erstellt! Bitte loggen Sie sich ein.');
+        }
         
         // Switch to login form and keep email
         setIsLogin(true);
@@ -89,7 +78,10 @@ const AuthPage = ({ onLogin }) => {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      setError(ProfiSlots.ErrorHandler.getMessage(error));
+      const errorMessage = ProfiSlots.ErrorHandler ? 
+        ProfiSlots.ErrorHandler.getMessage(error) : 
+        (error.message || 'Ein Fehler ist aufgetreten');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -149,7 +141,7 @@ const AuthPage = ({ onLogin }) => {
           React.createElement('span', {
             key: 'error-text',
             className: "text-red-700 text-sm"
-          }, error || 'Ein Fehler ist aufgetreten')
+          }, error)
         ])
       ]),
 
@@ -383,107 +375,15 @@ const AuthPage = ({ onLogin }) => {
             }, 'Dashboard & Statistiken')
           ])
         ])
-      ]),
-
-      // Demo Info
-      !isLogin && React.createElement('div', {
-        key: 'demo-info',
-        className: "mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200"
-      }, [
-        React.createElement('div', {
-          key: 'demo-content',
-          className: "flex items-start"
-        }, [
-          React.createElement(lucide.Info, {
-            key: 'info-icon',
-            className: "w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0"
-          }),
-          React.createElement('div', {
-            key: 'demo-text',
-            className: "text-xs text-blue-700"
-          }, [
-            React.createElement('p', {
-              key: 'demo-p1',
-              className: "font-medium"
-            }, 'Kostenlos testen!'),
-            React.createElement('p', {
-              key: 'demo-p2'
-            }, 'Erstellen Sie Ihren Account und testen Sie alle Funktionen.')
-          ])
-        ])
       ])
     ])
   ]);
 };
 
-// ==================== AUTH STATE MANAGEMENT ====================
-const useAuth = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Check for existing auth on page load
-    const checkAuth = () => {
-      try {
-        const token = ProfiSlots.Storage.get('token');
-        const savedUser = ProfiSlots.Storage.get('user');
-        
-        if (token && savedUser) {
-          setUser(savedUser);
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-        // Clear invalid data
-        ProfiSlots.Storage.remove('token');
-        ProfiSlots.Storage.remove('user');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Listen for auth events
-    const handleLogin = (event) => {
-      setUser(event.detail);
-    };
-
-    const handleLogout = () => {
-      setUser(null);
-    };
-
-    window.addEventListener('auth:login', handleLogin);
-    window.addEventListener('auth:logout', handleLogout);
-
-    return () => {
-      window.removeEventListener('auth:login', handleLogin);
-      window.removeEventListener('auth:logout', handleLogout);
-    };
-  }, []);
-
-  const login = (userData) => {
-    setUser(userData);
-  };
-
-  const logout = () => {
-    ProfiSlots.API.auth.logout();
-    setUser(null);
-  };
-
-  return {
-    user,
-    loading,
-    login,
-    logout,
-    isAuthenticated: !!user
-  };
-};
-
 // ==================== GLOBAL VERFÜGBAR MACHEN ====================
 window.ProfiSlots = window.ProfiSlots || {};
 Object.assign(window.ProfiSlots, {
-  AuthPage,
-  useAuth
+  AuthPage
 });
 
 console.log('✅ ProfiSlots Auth Component loaded');
