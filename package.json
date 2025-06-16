@@ -1,0 +1,21 @@
+{
+  "name": "terminbuchung-system",
+  "version": "1.0.0",
+  "description": "Professionelles Terminbuchungssystem",
+  "scripts": {
+    "build": "npm run build:client",
+    "build:client": "mkdir -p dist && cp -r public/* dist/",
+    "start": "node api/index.js",
+    "dev": "node api/index.js"
+  },
+  "dependencies": {
+    "@vercel/node": "^3.0.0",
+    "mysql2": "^3.6.0",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
